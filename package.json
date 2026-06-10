@@ -1,0 +1,9 @@
+{
+  "name": "rhythm-practice",
+  "version": "1.0.0",
+  "description": "16th Note Feel Trainer — a browser app for internalizing where individual 16th notes sit.",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}

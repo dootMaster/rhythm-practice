@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>16th Note Feel Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Accent colors (shared with keyframeguitar) */
+    --color-from: #6366F1;   /* indigo — beats / primary */
+    --color-to: #10B981;     /* emerald — playhead / correct */
+    --color-peek: #F59E0B;   /* amber — target bell */
+    --color-wrong: #EF4444;
+
+    --bg: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-hover: rgba(0, 0, 0, 0.05);
+    --bg-active: rgba(0, 0, 0, 0.1);
+    --bg-subtle: rgba(0, 0, 0, 0.025);
+    --text: #1e1e1e;
+    --text-secondary: rgba(0, 0, 0, 0.5);
+    --text-muted: rgba(0, 0, 0, 0.4);
+    --border: rgba(0, 0, 0, 0.2);
+    --border-light: rgba(0, 0, 0, 0.12);
+  }
+  body.dark {
+    --bg: #1a1a1a;
+    --bg-surface: #2a2a2a;
+    --bg-hover: rgba(255, 255, 255, 0.07);
+    --bg-active: rgba(255, 255, 255, 0.12);
+    --bg-subtle: rgba(255, 255, 255, 0.035);
+    --text: #e0e0e0;
+    --text-secondary: rgba(255, 255, 255, 0.5);
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --border: rgba(255, 255, 255, 0.2);
+    --border-light: rgba(255, 255, 255, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  *:focus-visible { outline: 2px solid var(--color-from); outline-offset: 2px; }
+
+  .app {
+    max-width: 860px;
+    margin: 0 auto;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 1rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.9rem;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header { text-align: center; position: relative; padding-bottom: 0.55rem; }
+  .header::after {
+    content: ''; position: absolute; bottom: 0; left: 50%;
+    transform: translateX(-50%); width: 56px; height: 2px;
+    background: linear-gradient(90deg, var(--color-from), var(--color-to));
+    border-radius: 1px;
+  }
+  .header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+  .subtitle {
+    margin: 0.3rem auto 0; max-width: 540px;
+    font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45;
+  }
+  .subtitle b { color: var(--text); font-weight: 600; }
+
+  /* Buttons & selects */
+  button, select {
+    font-family: 'Outfit', sans-serif; font-size: 0.85rem;
+    background: var(--bg-surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.4rem 0.8rem; cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  button:hover, select:hover { background: var(--bg-hover); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:disabled:hover { background: var(--bg-surface); }
+  button.primary { background: var(--color-from); border-color: var(--color-from); color: #fff; font-weight: 500; }
+  button.primary:hover { background: #4f46e5; }
+  button.primary.stop { background: var(--color-peek); border-color: var(--color-peek); color: #1e1e1e; }
+  button.primary.stop:hover { background: #d98a06; }
+
+  /* Mode tabs */
+  .mode-tabs { display: flex; gap: 0.4rem; justify-content: center; }
+  .mode-tabs button { padding: 0.4rem 1.2rem; font-weight: 500; }
+  .mode-tabs button.active { background: var(--color-from); border-color: var(--color-from); color: #fff; }
+
+  /* Toolbars */
+  .toolbar, .toggles, .quiz-bar, .preset-row, .bottom-bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  }
+  .toolbar { gap: 0.75rem 1.25rem; }
+  .toggles { gap: 0.45rem; }
+  .ctl { display: flex; align-items: center; gap: 0.5rem; }
+  .ctl label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .ctl .val { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--text-secondary); min-width: 3.6em; }
+  input[type=range] { width: 130px; accent-color: var(--color-from); }
+
+  /* Chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.32rem 0.7rem; border: 1px solid var(--border-light); border-radius: 999px;
+    font-size: 0.74rem; color: var(--text-secondary); cursor: pointer; user-select: none;
+    background: var(--bg-surface); transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .chip.on { border-color: var(--color-from); color: var(--color-from); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+  .chip.on .dot { background: var(--color-from); }
+
+  /* Grid — one horizontal timeline row, grouped by beat. Cells flex to fit. */
+  .grid { display: flex; justify-content: center; gap: 0.5rem; width: 100%; }
+  .beat {
+    flex: 1 1 0; min-width: 0; max-width: 180px;
+    display: flex; gap: 0.25rem; padding: 0.3rem;
+    border: 1px solid var(--border-light); border-radius: 10px; background: var(--bg-subtle);
+  }
+  .cell {
+    flex: 1 1 0; min-width: 0;
+    height: clamp(46px, 8.5vh, 66px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 7px; background: var(--bg-surface); border: 2px solid var(--border-light);
+    cursor: pointer; user-select: none;
+    transition: transform 0.04s ease, background-color 0.1s ease, border-color 0.1s ease;
+  }
+  .cell .lbl { font-size: 1rem; font-weight: 600; line-height: 1; }
+  .cell .sublbl { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; letter-spacing: 0.02em; }
+  .cell.downbeat .lbl { color: var(--color-from); }
+  .cell.target { background: color-mix(in srgb, var(--color-peek) 16%, var(--bg-surface)); border-color: var(--color-peek); }
+  .cell.target .lbl { color: var(--color-peek); }
+  .cell.playing { background: color-mix(in srgb, var(--color-to) 16%, var(--bg-surface)); border-color: var(--color-to); }
+  .cell.playing.target { background: color-mix(in srgb, var(--color-peek) 28%, var(--bg-surface)); border-color: var(--color-to); }
+  .cell.flash { transform: scale(0.9); }
+  .cell.correct { animation: pop 0.4s ease; border-color: var(--color-to); background: color-mix(in srgb, var(--color-to) 22%, var(--bg-surface)); }
+  .cell.wrong { animation: shake 0.3s ease; border-color: var(--color-wrong); background: color-mix(in srgb, var(--color-wrong) 14%, var(--bg-surface)); }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.12)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+  /* Quiz */
+  .quiz-bar { gap: 0.75rem; }
+  .score { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .score b { color: var(--text); }
+  .feedback { font-size: 0.85rem; font-weight: 500; min-height: 1.2em; }
+  .feedback.ok { color: var(--color-to); }
+  .feedback.no { color: var(--color-wrong); }
+
+  /* Panels, presets, hints */
+  #explorePanel, #quizPanel { display: flex; flex-direction: column; gap: 0.7rem; }
+  .preset-row { gap: 0.4rem; }
+  .preset-row button { font-size: 0.72rem; padding: 0.28rem 0.6rem; border-radius: 5px; color: var(--text-secondary); }
+  .hint { margin: 0 auto; max-width: 580px; text-align: center; font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; }
+  .hint code { background: var(--bg-active); padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; }
+
+  /* Bottom bar */
+  .bottom-bar { gap: 0.6rem; }
+  .theme-toggle {
+    background: none; border: 1px solid var(--border-light); border-radius: 4px;
+    padding: 0.22rem 0.6rem; font-size: 0.68rem; color: var(--text-muted);
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--border); background: none; }
+
+  /* Difficulty selector */
+  .difficulty { gap: 0.4rem; }
+  .diff-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-right: 0.2rem; }
+  .difficulty button { font-size: 0.78rem; padding: 0.32rem 0.85rem; }
+  .difficulty button.active { background: var(--color-from); border-color: var(--color-from); color: #fff; }
+
+  /* Ear-mode multi-select + grading */
+  .cell.selected { border-color: var(--color-from); background: color-mix(in srgb, var(--color-from) 16%, var(--bg-surface)); }
+  .cell.selected .lbl { color: var(--color-from); }
+  .cell.missed { border-style: dashed; border-color: var(--color-from); background: color-mix(in srgb, var(--color-from) 9%, var(--bg-surface)); }
+
+  /* Worth / points */
+  .worth { font-size: 0.78rem; color: var(--text-secondary); }
+  .worth b { color: var(--color-peek); font-variant-numeric: tabular-nums; }
+
+  /* Read mode */
+  .notation-wrap { position: relative; }
+  #notation { display: flex; justify-content: center; align-items: center; min-height: 116px; overflow-x: auto; }
+  #notation svg { max-width: 100%; }
+  .read-cue {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 2.6rem; font-weight: 600; color: var(--color-from); pointer-events: none;
+    text-shadow: 0 0 12px var(--bg), 0 0 12px var(--bg);
+  }
+  /* Tap-marker lane under the notation: gray ticks = note positions, colored
+     dots = where you actually tapped (offset left = early, right = late). */
+  .tap-lane { position: relative; height: 22px; margin: 2px auto 0; }
+  .tap-mark { position: absolute; transform: translateX(-50%); pointer-events: none; }
+  .tap-mark.target { top: 0; width: 2px; height: 9px; background: var(--text-muted); opacity: 0.45; }
+  .tap-mark.dot { top: 9px; width: 11px; height: 11px; border-radius: 50%; }
+  .tap-mark.perfect { background: var(--color-to); }
+  .tap-mark.good { background: var(--color-peek); }
+  .tap-mark.miss { top: 8px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--color-wrong); }
+  .tap-mark.extra { top: 4px; width: 2px; height: 15px; background: var(--color-wrong); }
+  .tap-pad {
+    display: block; width: 100%; max-width: 340px; margin: 0.1rem auto 0;
+    padding: 1.05rem; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.08em;
+    background: var(--color-from); color: #fff; border: none; border-radius: 12px;
+    transition: transform 0.05s ease, background-color 0.08s ease;
+  }
+  .tap-pad:hover { background: #4f46e5; }
+  .tap-pad.flash { transform: scale(0.97); background: var(--color-to); }
+  .tap-pad:disabled { opacity: 0.4; }
+  .tap-pad:disabled:hover { background: var(--color-from); }
+  .tap-hint { font-size: 0.7rem; font-weight: 400; opacity: 0.82; margin-left: 0.45rem; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <h1>16th Note Feel Trainer</h1>
+    <p class="subtitle">
+      Each beat splits into four 16ths — <b>1&nbsp;e&nbsp;&amp;&nbsp;a</b>. A steady pulse plays the beats;
+      a bell plays your target 16th. Loop it slow, feel where the bell sits, then speed up.
+    </p>
+  </header>
+
+  <div class="mode-tabs">
+    <button id="tabExplore" class="active">🎯 Explore</button>
+    <button id="tabEar">👂 Ear</button>
+    <button id="tabRead">🎼 Read</button>
+  </div>
+
+  <div class="difficulty" id="difficultyRow" style="display:none;">
+    <span class="diff-label">Difficulty</span>
+    <button data-diff="easy">Easy · 2</button>
+    <button data-diff="medium" class="active">Medium · 3</button>
+    <button data-diff="hard">Hard · 4</button>
+    <span class="diff-label" id="tolLabel" style="display:none; margin-left:0.6rem;">Tolerance</span>
+    <button data-tol="loose" style="display:none;">Loose</button>
+    <button data-tol="normal" class="active" style="display:none;">Normal</button>
+    <button data-tol="strict" style="display:none;">Strict</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="ctl">
+      <label>Tempo</label>
+      <input type="range" id="bpm" min="30" max="200" value="70" />
+      <span class="val"><b id="bpmVal">70</b> bpm</span>
+    </div>
+    <div class="ctl">
+      <label>Beats</label>
+      <select id="beats">
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="6">6</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Bell</label>
+      <select id="targetSound">
+        <option value="bell">Bell</option>
+        <option value="clap">Clap</option>
+        <option value="cow">Cowbell</option>
+      </select>
+    </div>
+    <button id="play" class="primary">▶ Start</button>
+  </div>
+
+  <div class="toggles">
+    <div class="chip" id="tgSubs"><span class="dot"></span> 16th ticks</div>
+    <div class="chip" id="tgCount"><span class="dot"></span> Count-in</div>
+    <div class="chip on" id="tgPulse"><span class="dot"></span> Beat pulse</div>
+  </div>
+
+  <!-- EXPLORE -->
+  <div id="explorePanel">
+    <div class="grid" id="grid"></div>
+    <div class="preset-row">
+      <button data-preset="clear">Clear</button>
+      <button data-preset="downbeats">Downbeats</button>
+      <button data-preset="e">The "e"s</button>
+      <button data-preset="and">The "&amp;"s</button>
+      <button data-preset="a">The "a"s</button>
+      <button data-preset="offbeats">Offbeats</button>
+      <button data-preset="gallop">Gallop</button>
+    </div>
+    <p class="hint">
+      Click cells to place target bells. Tap your foot on the <b>beats</b> only and feel where each bell lands.
+      Start with one target — e.g. just <code>the 'e' of 2</code> — then add more.
+    </p>
+  </div>
+
+  <!-- EAR -->
+  <div id="earPanel" style="display:none;">
+    <div class="quiz-bar">
+      <button id="earNew" class="primary">🔊 New phrase</button>
+      <button id="earReplay" disabled>↻ Replay</button>
+      <button id="earSubmit" disabled>✓ Submit</button>
+      <div class="chip" id="tgQuizPlayhead"><span class="dot"></span> Show playhead</div>
+      <span class="worth">Worth <b class="js-worth">100</b>%</span>
+      <span class="score"><b class="js-score">—</b> accuracy · <b class="js-phrases">0</b> phrases</span>
+      <span class="feedback" id="earFeedback"></span>
+    </div>
+    <div class="grid" id="earGrid"></div>
+    <p class="hint">
+      The phrase plays <b>once</b>. Click every 16th you heard, then <b>Submit</b>. Each replay halves the
+      credit for this phrase — try to get it on the first listen.
+    </p>
+  </div>
+
+  <!-- READ -->
+  <div id="readPanel" style="display:none;">
+    <div class="quiz-bar">
+      <button id="readNew" class="primary">🎼 New phrase</button>
+      <button id="readGo" disabled>▶ Perform</button>
+      <span class="worth">Worth <b class="js-worth">100</b>%</span>
+      <span class="score"><b class="js-score">—</b> accuracy · <b class="js-phrases">0</b> phrases</span>
+      <span class="feedback" id="readFeedback"></span>
+    </div>
+    <div class="notation-wrap">
+      <div id="notation"></div>
+      <div id="readCue" class="read-cue"></div>
+    </div>
+    <div id="tapLane" class="tap-lane"></div>
+    <button id="tapPad" class="tap-pad" disabled>TAP<span class="tap-hint">or Spacebar</span></button>
+    <p class="hint">
+      Read the rhythm, hit <b>Perform</b>: it counts you in (1·2·3·4), then tap each note in time — each hit
+      is graded early / on-time / late. Markers below the staff show where you landed (dot left of the
+      note = early, right = late). Set <b>Tolerance</b> for how tight the timing must be.
+    </p>
+  </div>
+
+  <div class="bottom-bar">
+    <button class="theme-toggle" id="themeToggle">◐ Theme</button>
+  </div>
+</div>
+
+<script src="vendor/vexflow.js"></script>
+<script src="rhythm.js"></script>
+<script>
+(() => {
+  "use strict";
+  const R = window.Rhythm;
+
+  // ---------- State ----------
+  let ctx = null;
+  let isPlaying = false;
+  let bpm = 70;
+  let beatsPerBar = 4;
+  let mode = "explore"; // "explore" | "ear" | "read"
+
+  let playSubs = false;
+  let playPulse = true;
+  let countIn = false;
+  let showQuizPlayhead = false;  // off by default — seeing the playhead gives the answer away
+  let difficulty = "medium";     // easy | medium | hard -> note count
+  let tolerance = "normal";      // read-mode timing strictness (loose|normal|strict)
+  let readAnchors = null;        // [{f, x}] time-fraction -> notation x, for tap markers
+  let readRenderWidth = 0;       // px width passed to the VexFlow renderer
+
+  // explore: user-placed target bells
+  let targets = new Set();
+
+  // ear/read: the current phrase
+  let phrase = [], phraseSet = new Set();
+  let phraseAnswered = false;
+  let earSelection = new Set();  // cells the user marked in ear mode
+  let replays = 0;               // replays used on the current phrase
+  let earnedTotal = 0, possibleTotal = 0, phrasesDone = 0; // running accuracy
+
+  // read mode performance capture
+  let tapTimes = [];             // audio-clock seconds of each tap
+  let tapWindowOpen = false;     // taps only count during the phrase bar
+  let attempted = false;         // has the current read phrase been performed once?
+  let phraseBanked = 0;          // best points already banked for the current phrase
+  let phraseCounted = false;     // has this phrase been counted in the phrase total?
+  let phraseStartTime = 0, phraseEndTime = 0, phraseActive = false, phraseTimer = null;
+
+  // scheduler (explore loop)
+  const LOOKAHEAD = 25;          // ms
+  const SCHEDULE_AHEAD = 0.12;   // s
+  let nextNoteTime = 0;
+  let current16th = 0;
+  let countInRemaining = 0;      // steps of count-in left
+  let timerId = null;
+  const scheduledQueue = [];     // {step, time} for visual sync
+  const EMPTY_SET = new Set();
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const grid = $("grid");
+  const earGrid = $("earGrid");
+
+  function steps() { return R.steps(beatsPerBar); }
+  function secondsPer16th() { return R.secondsPer16th(bpm); }
+
+  // ---------- Audio ----------
+  function ensureCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+  }
+
+  // simple click: short filtered noise / osc blip
+  function click(time, freq, gain, dur) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(gain, time + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + dur + 0.02);
+  }
+
+  function noiseBurst(time, gain, dur, hp) {
+    const n = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "highpass";
+    filt.frequency.value = hp || 1200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain, time);
+    src.connect(filt).connect(g).connect(ctx.destination);
+    src.start(time);
+    src.stop(time + dur + 0.02);
+  }
+
+  function targetSound(time) {
+    const kind = $("targetSound").value;
+    if (kind === "clap") {
+      noiseBurst(time, 0.9, 0.09, 1500);
+    } else if (kind === "cow") {
+      // two detuned squares
+      [560, 845].forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "square"; osc.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, time);
+        g.gain.linearRampToValueAtTime(0.5, time + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(time); osc.stop(time + 0.2);
+      });
+    } else {
+      // bell: bright sine with quick decay
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine"; osc.frequency.value = 1320;
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(0.85, time + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(time); osc.stop(time + 0.28);
+    }
+  }
+
+  // woodblock-ish "tok" for the count-in — distinct timbre from the bright
+  // performance-bar click, so you can hear when the count-in ends.
+  function countClick(time, accent) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = accent ? 920 : 660;
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(accent ? 0.6 : 0.42, time + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.07);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(time); osc.stop(time + 0.09);
+  }
+
+  function scheduleStep(step, time, isCountIn) {
+    // ear/read always keep a beat pulse and drop the quiet 16th ticks; explore
+    // honors the toggles. ear rings the phrase; read stays silent (user plays).
+    const pulseOn = mode === "explore" ? playPulse : true;
+    const subsOn = mode === "explore" ? playSubs : false;
+    const qt = mode === "ear" ? phraseSet : EMPTY_SET;
+    const ev = R.eventsForStep(step, {
+      playPulse: pulseOn, playSubs: subsOn, mode, targets, quizTargets: qt, isCountIn,
+    });
+    if (ev.beatClick) {
+      if (isCountIn) countClick(time, ev.beatClick === "down");
+      else click(time, ev.beatClick === "down" ? 1500 : 1000, 0.5, 0.05);
+    }
+    if (ev.subTick) click(time, 800, 0.12, 0.03);
+    if (ev.bell) targetSound(time);
+  }
+
+  function scheduler() {
+    while (nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD) {
+      if (countInRemaining > 0) {
+        scheduleStep(R.countInStep(countInRemaining, steps()), nextNoteTime, true);
+        countInRemaining--;
+        nextNoteTime += secondsPer16th();
+        continue;
+      }
+      scheduleStep(current16th, nextNoteTime, false);
+      scheduledQueue.push({ step: current16th, time: nextNoteTime });
+      nextNoteTime += secondsPer16th();
+      current16th = (current16th + 1) % steps();
+    }
+    timerId = setTimeout(scheduler, LOOKAHEAD);
+  }
+
+  // count-in clicks only on beats — rewrite scheduleStep call for clarity
+  // (handled above by passing isCountIn; we click only when step%4===0)
+
+  // ---------- Visual playhead ----------
+  let rafId = null;
+  let lastLitCell = -1;
+  function draw() {
+    // In ear mode the playhead would reveal the answer (it lights the cell
+    // exactly when the bell sounds). Suppress it until the user has answered,
+    // unless they explicitly opt in. Read mode has no grid.
+    const suppressPlayhead = R.shouldSuppressPlayhead(mode, showQuizPlayhead, phraseAnswered);
+    if (ctx) {
+      const now = ctx.currentTime;
+      // find most recent scheduled step that has started (always drain the queue)
+      let lit = -1;
+      while (scheduledQueue.length && scheduledQueue[0].time <= now) {
+        lit = scheduledQueue[0].step;
+        if (scheduledQueue.length > 1 && scheduledQueue[1].time <= now) {
+          scheduledQueue.shift();
+        } else break;
+      }
+      if (mode === "read") {
+        updateReadVisuals();
+      } else if (suppressPlayhead) {
+        clearPlayhead();
+      } else if (lit !== -1 && lit !== lastLitCell) {
+        setPlayhead(lit);
+        lastLitCell = lit;
+      }
+    }
+    rafId = requestAnimationFrame(draw);
+  }
+
+  // Count-in only: count UP in the meter (1 2 3 4). No cursor over the notation
+  // during the performance — you read it and keep time by ear.
+  function updateReadVisuals() {
+    const cue = $("readCue");
+    if (!phraseActive || ctx.currentTime >= phraseStartTime) { cue.textContent = ""; return; }
+    const beatDur = secondsPer16th() * 4;
+    const remaining = Math.ceil((phraseStartTime - ctx.currentTime) / beatDur);
+    cue.textContent = String(Math.max(1, Math.min(beatsPerBar, beatsPerBar - remaining + 1)));
+  }
+
+  function activeGrid() { return mode === "ear" ? earGrid : grid; }
+
+  function clearPlayhead() {
+    if (lastLitCell === -1 && !document.querySelector(".cell.playing")) return;
+    document.querySelectorAll(".cell.playing").forEach(c => c.classList.remove("playing"));
+    lastLitCell = -1;
+  }
+
+  function setPlayhead(step) {
+    const g = activeGrid();
+    g.querySelectorAll(".cell.playing").forEach(c => c.classList.remove("playing"));
+    const cell = g.querySelector('.cell[data-step="' + step + '"]');
+    if (cell) {
+      cell.classList.add("playing");
+      cell.classList.add("flash");
+      setTimeout(() => cell.classList.remove("flash"), 70);
+    }
+  }
+
+  // ---------- Grid build ----------
+  // One horizontal timeline row: time flows left -> right, grouped by beat.
+  function buildGrid(container, opts) {
+    container.innerHTML = "";
+    for (let b = 0; b < beatsPerBar; b++) {
+      const beatEl = document.createElement("div");
+      beatEl.className = "beat";
+      for (let s = 0; s < 4; s++) {
+        const step = b * 4 + s;
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.step = step;
+        if (s === 0) cell.classList.add("downbeat"); // beat starts
+        const labels = R.cellLabels(step);
+        const lbl = document.createElement("div");
+        lbl.className = "lbl";
+        lbl.textContent = labels.main;
+        const sub = document.createElement("div");
+        sub.className = "sublbl";
+        sub.textContent = labels.sub;
+        cell.appendChild(lbl); cell.appendChild(sub);
+        if (opts.onClick) cell.addEventListener("click", () => opts.onClick(step, cell));
+        beatEl.appendChild(cell);
+      }
+      container.appendChild(beatEl);
+    }
+    refreshTargets(container);
+  }
+
+  function refreshTargets(container) {
+    container.querySelectorAll(".cell").forEach(c => {
+      const step = +c.dataset.step;
+      c.classList.toggle("target", mode === "explore" && targets.has(step));
+    });
+  }
+
+  // ---------- Explore interactions ----------
+  function onExploreCellClick(step, cell) {
+    if (targets.has(step)) targets.delete(step);
+    else targets.add(step);
+    refreshTargets(grid);
+  }
+
+  function applyPreset(name) {
+    targets = new Set(R.presetSteps(name, beatsPerBar));
+    refreshTargets(grid);
+  }
+
+  // ========== Explore transport (continuous loop) ==========
+  function startLoop() {
+    ensureCtx();
+    isPlaying = true;
+    current16th = 0;
+    nextNoteTime = ctx.currentTime + 0.1;
+    countInRemaining = countIn ? steps() : 0;
+    scheduledQueue.length = 0;
+    lastLitCell = -1;
+    scheduler();
+    if (!rafId) draw();
+    const btn = $("play");
+    btn.textContent = "■ Stop";
+    btn.classList.add("stop");
+  }
+  function stopLoop() {
+    isPlaying = false;
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+    scheduledQueue.length = 0;
+    document.querySelectorAll(".cell.playing").forEach(c => c.classList.remove("playing"));
+    lastLitCell = -1;
+    const btn = $("play");
+    btn.textContent = "▶ Start";
+    btn.classList.remove("stop");
+  }
+  function toggleLoop() { if (isPlaying) stopLoop(); else startLoop(); }
+
+  // ========== Phrase transport (ear/read: count-in + one bar, then stop) ==========
+  function playPhrase() {
+    ensureCtx();
+    if (timerId) { clearTimeout(timerId); timerId = null; }      // never loop here
+    if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
+    const n = steps(), dt = secondsPer16th();
+    let t = ctx.currentTime + 0.2;
+    scheduledQueue.length = 0;
+    lastLitCell = -1;
+    // Read needs a count-in to come in on; Ear doesn't (the beat pulse plays
+    // through the phrase bar anyway), so it starts the phrase right away.
+    if (mode === "read") {
+      for (let i = 0; i < n; i++) { scheduleStep(i, t, true); t += dt; }
+    }
+    phraseStartTime = t;
+    for (let i = 0; i < n; i++) {
+      scheduleStep(i, t, false);
+      if (mode === "ear") scheduledQueue.push({ step: i, time: t });
+      t += dt;
+    }
+    phraseEndTime = t;
+    if (mode === "read") tapTimes = [];
+    phraseActive = true; isPlaying = true;
+    if (!rafId) draw();
+    // open the tap window when the phrase bar begins (small lead for early taps)
+    tapWindowOpen = false;
+    const openInMs = (phraseStartTime - ctx.currentTime) * 1000 - 150;
+    setTimeout(() => {
+      if (phraseActive) { tapWindowOpen = true; if (mode === "read") $("tapPad").disabled = false; }
+    }, Math.max(0, openInMs));
+    phraseTimer = setTimeout(onPhraseEnd, (phraseEndTime - ctx.currentTime) * 1000 + 60);
+  }
+  function onPhraseEnd() {
+    phraseActive = false; isPlaying = false; tapWindowOpen = false;
+    scheduledQueue.length = 0;   // don't let a stale entry re-light a cell
+    clearPlayhead();
+    if (mode === "read") {
+      $("tapPad").disabled = true;
+      $("readCue").textContent = "";
+      $("readGo").disabled = false;      // perform again (counts as a replay)
+      $("readGo").textContent = "↻ Perform again";
+      gradeRead();
+    }
+  }
+
+  // ========== Phrase lifecycle (shared by ear + read) ==========
+  let advanceTimer = null;
+  function clearAdvance() { if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; } }
+  function scheduleAdvance(fn) { clearAdvance(); advanceTimer = setTimeout(fn, 1100); }
+
+  function freshPhrase(autoplay) {
+    ensureCtx();
+    clearAdvance();
+    if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
+    phraseActive = false; tapWindowOpen = false;
+    phrase = R.randomPattern(R.difficultyNoteCount(difficulty), steps(), Math.random);
+    phraseSet = new Set(phrase);
+    replays = 0; phraseAnswered = false; earSelection = new Set(); tapTimes = [];
+    attempted = false; phraseBanked = 0; phraseCounted = false;
+    updatePoints();
+    if (mode === "ear") {
+      resetEarGrid();
+      $("earSubmit").disabled = false;
+      $("earReplay").disabled = false;
+      setFeedback("earFeedback", "", "");
+    } else if (mode === "read") {
+      renderNotation(phrase);            // also clears the tap lane
+      $("readGo").disabled = false;
+      $("readGo").textContent = "▶ Perform";
+      $("tapPad").disabled = true;
+      $("readCue").textContent = "";
+      setFeedback("readFeedback", "", "");
+    }
+    if (autoplay) playPhrase();
+  }
+  // Ear: replay the phrase audio. Before answering this costs points; after
+  // answering it's a free relisten (the question is already scored) and it
+  // cancels any pending auto-advance so you can study it as long as you like.
+  function replayPhrase() {
+    if (!phrase.length) return;
+    if (phraseAnswered) {
+      clearAdvance();
+    } else {
+      replays++;
+      updatePoints();
+    }
+    playPhrase();
+  }
+  // Read: start an attempt — count-in, then record taps. Re-performing the same
+  // phrase counts as a replay (first attempt is free).
+  function performRead() {
+    if (!phrase.length) return;
+    if (attempted) replays++;
+    attempted = true;
+    phraseAnswered = false;
+    $("readGo").disabled = true;
+    $("tapLane").innerHTML = "";        // clear last attempt's markers
+    setFeedback("readFeedback", "", "");
+    updatePoints();
+    playPhrase();
+  }
+  function resetEarGrid() {
+    earGrid.querySelectorAll(".cell").forEach(c =>
+      c.classList.remove("selected", "correct", "wrong", "missed", "playing"));
+  }
+
+  function updatePoints() {
+    // Worth = max credit still attainable for this phrase (100% → 50% → 25% per replay)
+    const worth = phrase.length ? Math.round(Math.pow(0.5, replays) * 100) : 0;
+    document.querySelectorAll(".js-worth").forEach(e => e.textContent = worth);
+    document.querySelectorAll(".js-score").forEach(e =>
+      e.textContent = possibleTotal > 0 ? R.percent(earnedTotal, possibleTotal) + "%" : "—");
+    document.querySelectorAll(".js-phrases").forEach(e => e.textContent = phrasesDone);
+  }
+  function setFeedback(id, text, cls) {
+    const e = $(id); if (!e) return;
+    e.textContent = text;
+    e.className = "feedback" + (cls ? " " + cls : "");
+  }
+
+  // ========== Ear answering ==========
+  function onEarCellClick(step, cell) {
+    if (phraseAnswered || !phrase.length) return;
+    if (earSelection.has(step)) { earSelection.delete(step); cell.classList.remove("selected"); }
+    else { earSelection.add(step); cell.classList.add("selected"); }
+  }
+  function submitEar() {
+    if (!phrase.length || phraseAnswered) return;
+    phraseAnswered = true;
+    $("earSubmit").disabled = true;
+    $("earReplay").disabled = false; // allow a free relisten after answering
+    const g = R.gradeSelection(earSelection, phraseSet);
+    const base = R.basePoints(phrase.length);
+    const earned = Math.round(R.pointsAvailable(base, replays) * g.fraction);
+    earnedTotal += earned; possibleTotal += base; phrasesDone++; updatePoints();
+    earGrid.querySelectorAll(".cell").forEach(c => {
+      const s = +c.dataset.step;
+      c.classList.remove("selected");
+      const inT = phraseSet.has(s), inS = earSelection.has(s);
+      if (inT && inS) c.classList.add("correct");
+      else if (inT && !inS) c.classList.add("missed");
+      else if (!inT && inS) c.classList.add("wrong");
+    });
+    let msg = g.correct
+      ? "✓ Perfect!"
+      : g.hits + "/" + phraseSet.size + " right"
+        + (g.falsePos ? ", " + g.falsePos + " extra" : "")
+        + (g.missed ? ", " + g.missed + " missed" : "");
+    msg += "  →  " + R.percent(earned, base) + "%";
+    setFeedback("earFeedback", msg, g.correct ? "ok" : "no");
+    if (g.correct) scheduleAdvance(() => freshPhrase(true));
+  }
+
+  // ========== Read performance ==========
+  function registerTap() {
+    if (mode !== "read" || !tapWindowOpen) return;
+    tapTimes.push(ctx.currentTime);
+    const pad = $("tapPad");
+    pad.classList.add("flash"); setTimeout(() => pad.classList.remove("flash"), 80);
+    click(ctx.currentTime + 0.001, 1100, 0.22, 0.03); // hear your own tap
+  }
+  function gradeRead() {
+    if (!phrase.length) return;
+    phraseAnswered = true;
+    const dt = secondsPer16th();
+    const noteTimesMs = phrase.map(s => s * dt * 1000);          // relative to phrase start
+    const tapMs = tapTimes
+      .map(t => (t - phraseStartTime) * 1000)
+      .filter(ms => ms >= -180);                                  // drop count-in noodling
+    const windows = R.timingWindows(tolerance);
+    const g = R.gradePerformance(noteTimesMs, tapMs, windows);
+    renderTapMarkers(g.perNote, g.extraTaps, steps() * dt * 1000); // show where you landed
+    const base = R.basePoints(phrase.length);
+    const earned = Math.round(R.pointsAvailable(base, replays) * g.fraction);
+    // Bank the best attempt once per phrase (don't stack credit across replays).
+    if (earned > phraseBanked) { earnedTotal += earned - phraseBanked; phraseBanked = earned; }
+    if (!phraseCounted) { possibleTotal += base; phrasesDone++; phraseCounted = true; }
+    updatePoints();
+    const counts = { perfect: 0, good: 0, miss: 0 };
+    g.perNote.forEach(p => counts[p.grade]++);
+    let msg = "Perfect ×" + counts.perfect;
+    if (counts.good) msg += " · Good ×" + counts.good;
+    if (counts.miss) msg += " · Missed ×" + counts.miss;
+    if (g.falsePos) msg += " · " + g.falsePos + " extra";
+    msg += "  →  " + R.percent(earned, base) + "%";
+    const clean = counts.miss === 0 && g.falsePos === 0;
+    // No auto-advance in read mode: it stops and waits. Perform again or New phrase.
+    setFeedback("readFeedback", msg, clean ? "ok" : "no");
+  }
+
+  // ========== Notation (VexFlow) ==========
+  function themeColor() {
+    return (getComputedStyle(document.body).getPropertyValue("--text").trim()) || "#1e1e1e";
+  }
+  function renderNotation(pattern) {
+    const host = $("notation");
+    if (!window.Vex) { host.textContent = "(notation unavailable)"; return; }
+    const VF = Vex.Flow;
+    host.innerHTML = "";
+    const width = Math.min(740, Math.max(320, host.clientWidth || 700));
+    const color = themeColor();
+    const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
+    renderer.resize(width, 116);
+    const c = renderer.getContext();
+    c.setFillStyle(color); c.setStrokeStyle(color);
+    const stave = new VF.Stave(8, 14, width - 16);
+    stave.addTimeSignature(beatsPerBar + "/4");
+    stave.setContext(c).draw();
+    const items = R.barDurations(pattern, beatsPerBar);
+    const notes = items.map(it => {
+      const sn = it.isRest
+        ? new VF.StaveNote({ keys: ["b/4"], duration: it.dur })
+        : new VF.StaveNote({ keys: ["b/4"], duration: "16", stemDirection: 1 });
+      sn.setStyle({ fillStyle: color, strokeStyle: color });
+      return sn;
+    });
+    const beams = VF.Beam.generateBeams(notes, { groups: [new VF.Fraction(1, 4)] });
+    VF.Formatter.FormatAndDraw(c, stave, notes);
+    beams.forEach(b => {
+      b.setContext(c);
+      if (b.setStyle) b.setStyle({ fillStyle: color, strokeStyle: color });
+      b.draw();
+    });
+
+    // Build time-fraction -> notation-x anchors so we can plot tap markers later.
+    const total = steps();
+    readRenderWidth = width;
+    readAnchors = [{ f: 0, x: stave.getNoteStartX() }];
+    items.forEach((it, i) => {
+      if (!it.isRest) readAnchors.push({ f: it.step / total, x: notes[i].getAbsoluteX() });
+    });
+    readAnchors.push({ f: 1, x: stave.getNoteEndX() });
+    readAnchors.sort((a, b) => a.f - b.f);
+    $("tapLane").innerHTML = "";
+  }
+
+  // Linear interpolation across the notation anchors: time fraction (0..1) -> svg x.
+  function notationX(f) {
+    const a = readAnchors;
+    if (!a || !a.length) return 0;
+    if (f <= a[0].f) return a[0].x;
+    for (let i = 1; i < a.length; i++) {
+      if (f <= a[i].f) {
+        const p = a[i - 1], q = a[i], t = (q.f - p.f) ? (f - p.f) / (q.f - p.f) : 0;
+        return p.x + t * (q.x - p.x);
+      }
+    }
+    return a[a.length - 1].x;
+  }
+
+  // Draw the gray note ticks + your colored tap dots under the staff.
+  function renderTapMarkers(perNote, extraTaps, barMs) {
+    const lane = $("tapLane");
+    lane.innerHTML = "";
+    const svg = $("notation").querySelector("svg");
+    if (!svg || !readAnchors) return;
+    const laneRect = lane.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    const scale = svgRect.width / readRenderWidth;
+    const leftOff = svgRect.left - laneRect.left;
+    const px = xSvg => leftOff + xSvg * scale;
+    const pxPerMs = (px(notationX(1)) - px(notationX(0))) / barMs;
+    const total = steps();
+    const mark = (cls, leftPx) => {
+      const d = document.createElement("div");
+      d.className = "tap-mark " + cls;
+      d.style.left = leftPx + "px";
+      lane.appendChild(d);
+    };
+    perNote.forEach((p, i) => {
+      const noteX = px(notationX(phrase[i] / total));
+      mark("target", noteX);                                   // where the note is
+      if (p.grade === "miss") mark("miss", noteX);             // you didn't tap it
+      else mark("dot " + p.grade, noteX + p.deltaMs * pxPerMs); // your tap, offset by error
+    });
+    extraTaps.forEach(ms => mark("extra", px(notationX(ms / barMs)))); // stray taps
+  }
+
+  // ========== Wiring ==========
+  function rebuildGrids() {
+    buildGrid(grid, { onClick: onExploreCellClick });
+    buildGrid(earGrid, { onClick: onEarCellClick });
+  }
+
+  $("bpm").addEventListener("input", e => {
+    bpm = +e.target.value; $("bpmVal").textContent = bpm;
+  });
+  $("beats").addEventListener("change", e => {
+    beatsPerBar = +e.target.value;
+    targets = new Set([...targets].filter(s => s < steps()));
+    rebuildGrids();
+    if (mode !== "explore") freshPhrase(false); // refit phrase to the new bar
+  });
+  $("play").addEventListener("click", toggleLoop);
+
+  function chip(id, get, set) {
+    $(id).addEventListener("click", () => {
+      set(!get());
+      $(id).classList.toggle("on", get());
+    });
+  }
+  chip("tgSubs", () => playSubs, v => playSubs = v);
+  chip("tgPulse", () => playPulse, v => playPulse = v);
+  chip("tgCount", () => countIn, v => countIn = v);
+  chip("tgQuizPlayhead", () => showQuizPlayhead, v => showQuizPlayhead = v);
+
+  document.querySelectorAll("[data-preset]").forEach(b =>
+    b.addEventListener("click", () => applyPreset(b.dataset.preset)));
+
+  // difficulty
+  document.querySelectorAll("[data-diff]").forEach(b =>
+    b.addEventListener("click", () => {
+      difficulty = b.dataset.diff;
+      document.querySelectorAll("[data-diff]").forEach(x =>
+        x.classList.toggle("active", x === b));
+      if (mode !== "explore") freshPhrase(false); // apply immediately (silent)
+    }));
+
+  // rhythmic tolerance (read mode) — applies to the next grading
+  document.querySelectorAll("[data-tol]").forEach(b =>
+    b.addEventListener("click", () => {
+      tolerance = b.dataset.tol;
+      document.querySelectorAll("[data-tol]").forEach(x =>
+        x.classList.toggle("active", x === b));
+    }));
+
+  $("earNew").addEventListener("click", () => freshPhrase(true));
+  $("earReplay").addEventListener("click", replayPhrase);
+  $("earSubmit").addEventListener("click", submitEar);
+  $("readNew").addEventListener("click", () => freshPhrase(false)); // show notation, no audio
+  $("readGo").addEventListener("click", performRead);
+  $("tapPad").addEventListener("click", registerTap);
+
+  function setMode(m) {
+    stopLoop();
+    clearAdvance();
+    if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
+    phraseActive = false; tapWindowOpen = false;
+    clearPlayhead();
+    mode = m;
+    $("tabExplore").classList.toggle("active", m === "explore");
+    $("tabEar").classList.toggle("active", m === "ear");
+    $("tabRead").classList.toggle("active", m === "read");
+    $("explorePanel").style.display = m === "explore" ? "" : "none";
+    $("earPanel").style.display = m === "ear" ? "" : "none";
+    $("readPanel").style.display = m === "read" ? "" : "none";
+    $("difficultyRow").style.display = m === "explore" ? "none" : "";
+    // tolerance controls live in the difficulty row but only apply to read mode
+    const tolOn = m === "read";
+    $("tolLabel").style.display = tolOn ? "" : "none";
+    document.querySelectorAll("[data-tol]").forEach(x => x.style.display = tolOn ? "" : "none");
+    document.querySelector(".toggles").style.display = m === "explore" ? "" : "none";
+    $("play").style.display = m === "explore" ? "" : "none";
+    lastLitCell = -1;
+    refreshTargets(grid);
+    if (m !== "explore") freshPhrase(false); // set up a phrase (no autoplay)
+  }
+  $("tabExplore").addEventListener("click", () => setMode("explore"));
+  $("tabEar").addEventListener("click", () => setMode("ear"));
+  $("tabRead").addEventListener("click", () => setMode("read"));
+
+  // keyboard: space = play/stop in explore, tap in read.
+  // The keydown handler fully owns Space: we blur any focused button and
+  // preventDefault so the browser doesn't "click" it (e.g. a just-clicked
+  // New phrase), which would hijack spacebar tapping.
+  document.addEventListener("keydown", e => {
+    if (e.code !== "Space") return;
+    const tag = e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    e.preventDefault();
+    const ae = document.activeElement;
+    if (ae && ae.tagName === "BUTTON") ae.blur();
+    if (e.repeat) return;            // discrete presses only
+    if (mode === "read") registerTap();
+    else if (mode === "explore") toggleLoop();
+  });
+
+  // theme (light default, matches keyframeguitar; persisted)
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark", dark);
+    try { localStorage.setItem("rhythm-theme", dark ? "dark" : "light"); } catch (_) {}
+    if (mode === "read" && phrase.length) renderNotation(phrase); // re-color notation
+  }
+  $("themeToggle").addEventListener("click", () =>
+    applyTheme(!document.body.classList.contains("dark")));
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem("rhythm-theme"); } catch (_) {}
+  if (savedTheme) applyTheme(savedTheme === "dark");
+
+  // init
+  rebuildGrids();
+  applyPreset("downbeats");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+# 16th Note Feel Trainer
+
+A browser app for internalizing where individual 16th notes (`1 e & a`) sit inside a beat.
+Open `index.html` directly — no build, no server.
+
+## Files
+
+| File                | Role                                                              |
+|---------------------|-------------------------------------------------------------------|
+| `index.html`        | UI + Web Audio scheduler + DOM wiring. Loads VexFlow + `rhythm.js`.|
+| `rhythm.js`         | **Pure logic**, no DOM/audio/timers. Single source of truth.      |
+| `rhythm.test.js`    | Unit tests for `rhythm.js` (Node built-in runner, zero deps).     |
+| `vendor/vexflow.js` | Vendored VexFlow 4 (UMD, `window.Vex`) for read-mode notation.    |
+
+## Modes
+
+- **Explore** — place target bells on a 16th grid; continuous loop; feel where they sit.
+- **Ear** — a phrase of N notes plays **once**; click every 16th you heard, then Submit. Replays cost points (active recall).
+- **Read** — a rhythm in standard notation (rests merged into the largest beat-aligned values). **New phrase** shows the notation silently; **Perform** counts you in in the meter (1·2·3·4, distinct woodblock), then records your taps for one bar, stops, and grades early / on-time / late. A marker lane under the staff plots each note (gray tick) against your tap (colored dot, offset left = early / right = late; red tick = stray tap). **Tolerance** (Loose / Normal / Strict) sets the perfect/good timing windows. No auto-advance — Perform again (costs points) or New phrase. Best attempt per phrase is banked.
+
+Difficulty (Easy/Med/Hard = 2/3/4 notes, all on the full 16th grid) drives Ear + Read. Scoring is an **accuracy %** (credit earned ÷ credit possible, weighted by note count). A phrase's credit ceiling halves per replay (Worth 100% → 50% → 25%); your answer's correctness scales it. Read banks the best attempt per phrase.
+
+## Run the tests
+
+```sh
+npm test        # or: node --test
+```
+
+## Adding features without regressions
+
+Put any new *logic* in `rhythm.js` as a pure function and test it in `rhythm.test.js`.
+`index.html` should only translate those decisions into sound/DOM. Things already
+covered by tests (don't let these silently change):
+
+- step geometry (`steps`, `subOf`, `beatOf`, `isBeat`, `isDownbeat`)
+- tempo math (`secondsPer16th`)
+- labels & spoken names (`cellLabels`, `stepName`)
+- presets (`presetSteps`)
+- **what sounds fire per step** (`eventsForStep`) — the core scheduler decision
+- count-in indexing (`countInStep`)
+- ear-mode playhead suppression (`shouldSuppressPlayhead`)
+- single-note quiz feedback (`quizResult`)
+- difficulty → note count (`difficultyNoteCount`) and phrase generation (`randomPattern`)
+- notation rest-merging (`barDurations`) — readable rests, not stacked 16ths
+- points: `basePoints`, `pointsAvailable` (replay halving)
+- multi-note grading (`gradeSelection`)
+- read-mode timing (`classifyTiming`, `gradePerformance` incl. stray-tap reporting, `timingWindows`)
+
+Examples of features that fit this pattern: swing/shuffle (extend `secondsPer16th`
+into a per-step offset fn), accent patterns, triplet mode (generalize the `4`),
+new presets, scoring streaks.
