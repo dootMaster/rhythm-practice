@@ -734,7 +734,9 @@
   function scheduleAdvance(fn) { clearAdvance(); advanceTimer = setTimeout(fn, 1100); }
 
   function freshPhrase(autoplay) {
-    ensureCtx();
+    // No ensureCtx() here — playPhrase() creates the audio context when we
+    // actually play, so restoring a mode on load doesn't poke AudioContext
+    // before a user gesture (which the browser warns about).
     clearAdvance();
     if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
     phraseActive = false; tapWindowOpen = false;
@@ -857,7 +859,7 @@
         + (g.missed ? ", " + g.missed + " missed" : "");
     msg += "  →  " + R.percent(earned, base) + "%";
     setFeedback("earFeedback", msg, g.correct ? "ok" : "no");
-    if (g.correct) scheduleAdvance(() => freshPhrase(true));
+    // No auto-advance — it stays put. Click New phrase when you're ready.
   }
 
   // ========== Read performance ==========
@@ -1064,6 +1066,7 @@
     lastLitCell = -1;
     refreshTargets(grid);
     if (m !== "explore") freshPhrase(false); // set up a phrase (no autoplay)
+    try { localStorage.setItem("rhythm-mode", m); } catch (_) {}
   }
   $("tabExplore").addEventListener("click", () => setMode("explore"));
   $("tabEar").addEventListener("click", () => setMode("ear"));
@@ -1109,6 +1112,9 @@
   // init
   rebuildGrids();
   applyPreset("downbeats");
+  let savedMode = "explore";
+  try { savedMode = localStorage.getItem("rhythm-mode") || "explore"; } catch (_) {}
+  if (savedMode !== "explore") setMode(savedMode); // restore last tab (explore is the default)
 })();
 </script>
 </body>
