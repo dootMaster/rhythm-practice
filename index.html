@@ -172,6 +172,28 @@
   }
   .theme-toggle:hover { color: var(--text); border-color: var(--border); background: none; }
 
+  /* History popover (hidden by default) */
+  .history-panel {
+    position: fixed; left: 50%; bottom: 3.4rem; transform: translateX(-50%);
+    width: min(440px, 92vw); max-height: 62vh; overflow-y: auto;
+    background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.8rem 1rem; box-shadow: 0 10px 34px rgba(0,0,0,0.28); z-index: 60;
+  }
+  .history-head { display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .history-close { background: none; border: none; color: var(--text-muted); font-size: 0.95rem; padding: 0 0.2rem; }
+  .history-close:hover { color: var(--text); background: none; }
+  .history-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.34rem 0;
+    border-top: 1px solid var(--border-light); font-size: 0.8rem; }
+  .history-row .h-mode { width: 1.3rem; text-align: center; }
+  .history-row .h-notes { color: var(--text-muted); width: 2.2rem; }
+  .history-row .h-pct { font-variant-numeric: tabular-nums; font-weight: 600; width: 3rem; }
+  .history-row .h-pct.good { color: var(--color-to); }
+  .history-row .h-pct.mid { color: var(--color-peek); }
+  .history-row .h-pct.low { color: var(--color-wrong); }
+  .history-row .h-time { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .history-empty { color: var(--text-muted); font-size: 0.8rem; }
+
   /* Difficulty selector */
   .difficulty { gap: 0.4rem; }
   .diff-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-right: 0.2rem; }
@@ -337,7 +359,16 @@
   </div>
 
   <div class="bottom-bar">
+    <button class="theme-toggle" id="historyToggle">📊 History</button>
     <button class="theme-toggle" id="themeToggle">◐ Theme</button>
+  </div>
+
+  <div id="historyPanel" class="history-panel" style="display:none;">
+    <div class="history-head">
+      <span>Last 10 submissions</span>
+      <button class="history-close" id="historyClose">✕</button>
+    </div>
+    <div id="historyBody"><div class="history-empty">No submissions yet.</div></div>
   </div>
 </div>
 
@@ -373,6 +404,8 @@
   let earSelection = new Set();  // cells the user marked in ear mode
   let replays = 0;               // replays used on the current phrase
   let earnedTotal = 0, possibleTotal = 0, phrasesDone = 0; // running accuracy
+  let history = [];              // last 10 submissions {mode, pct, notes, seconds}
+  let submissionStart = 0;       // perf-clock ms when the current attempt began
 
   // read mode performance capture
   let tapTimes = [];             // audio-clock seconds of each tap
@@ -709,6 +742,7 @@
     phraseSet = new Set(phrase);
     replays = 0; phraseAnswered = false; earSelection = new Set(); tapTimes = [];
     attempted = false; phraseBanked = 0; phraseCounted = false;
+    submissionStart = performance.now();   // clock starts when the phrase is presented
     updatePoints();
     if (mode === "ear") {
       resetEarGrid();
@@ -745,6 +779,7 @@
     if (attempted) replays++;
     attempted = true;
     phraseAnswered = false;
+    submissionStart = performance.now(); // time this attempt
     $("readGo").disabled = true;
     $("tapLane").innerHTML = "";        // clear last attempt's markers
     setFeedback("readFeedback", "", "");
@@ -770,6 +805,27 @@
     e.className = "feedback" + (cls ? " " + cls : "");
   }
 
+  // ----- Submission history -----
+  function recordSubmission(m, pct) {
+    const seconds = Math.max(0, (performance.now() - submissionStart) / 1000);
+    history = R.pushRecent(history, { mode: m, pct: pct, notes: phrase.length, seconds: seconds }, 10);
+    try { localStorage.setItem("rhythm-history", JSON.stringify(history)); } catch (_) {}
+    renderHistory();
+  }
+  function renderHistory() {
+    const body = $("historyBody");
+    if (!history.length) { body.innerHTML = '<div class="history-empty">No submissions yet.</div>'; return; }
+    body.innerHTML = history.map(h => {
+      const icon = h.mode === "read" ? "🎼" : "👂";
+      const cls = h.pct >= 80 ? "good" : h.pct >= 50 ? "mid" : "low";
+      return '<div class="history-row">'
+        + '<span class="h-mode">' + icon + '</span>'
+        + '<span class="h-notes">' + h.notes + 'n</span>'
+        + '<span class="h-pct ' + cls + '">' + h.pct + '%</span>'
+        + '<span class="h-time">' + h.seconds.toFixed(1) + 's</span></div>';
+    }).join("");
+  }
+
   // ========== Ear answering ==========
   function onEarCellClick(step, cell) {
     if (phraseAnswered || !phrase.length) return;
@@ -785,6 +841,7 @@
     const base = R.basePoints(phrase.length);
     const earned = Math.round(R.pointsAvailable(base, replays) * g.fraction);
     earnedTotal += earned; possibleTotal += base; phrasesDone++; updatePoints();
+    recordSubmission("ear", R.percent(earned, base));
     earGrid.querySelectorAll(".cell").forEach(c => {
       const s = +c.dataset.step;
       c.classList.remove("selected");
@@ -828,6 +885,7 @@
     if (earned > phraseBanked) { earnedTotal += earned - phraseBanked; phraseBanked = earned; }
     if (!phraseCounted) { possibleTotal += base; phrasesDone++; phraseCounted = true; }
     updatePoints();
+    recordSubmission("read", R.percent(earned, base));
     const counts = { perfect: 0, good: 0, miss: 0 };
     g.perNote.forEach(p => counts[p.grade]++);
     let msg = "Perfect ×" + counts.perfect;
@@ -1035,6 +1093,15 @@
   }
   $("themeToggle").addEventListener("click", () =>
     applyTheme(!document.body.classList.contains("dark")));
+
+  // history popover
+  $("historyToggle").addEventListener("click", () => {
+    const p = $("historyPanel");
+    p.style.display = p.style.display === "none" ? "" : "none";
+  });
+  $("historyClose").addEventListener("click", () => { $("historyPanel").style.display = "none"; });
+  try { history = JSON.parse(localStorage.getItem("rhythm-history")) || []; } catch (_) { history = []; }
+  renderHistory();
   let savedTheme = null;
   try { savedTheme = localStorage.getItem("rhythm-theme"); } catch (_) {}
   if (savedTheme) applyTheme(savedTheme === "dark");

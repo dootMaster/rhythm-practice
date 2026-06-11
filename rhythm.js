@@ -211,6 +211,11 @@
     return whole > 0 ? Math.round((part / whole) * 100) : 0;
   }
 
+  // Prepend an entry and keep at most `max`, newest first (for the history log).
+  function pushRecent(list, entry, max) {
+    return [entry].concat(list || []).slice(0, max);
+  }
+
   function toSet(x) {
     if (!x) return new Set();
     return typeof x.has === "function" ? x : new Set(x);
@@ -301,6 +306,7 @@
     basePoints: basePoints,
     pointsAvailable: pointsAvailable,
     percent: percent,
+    pushRecent: pushRecent,
     gradeSelection: gradeSelection,
     classifyTiming: classifyTiming,
     gradePerformance: gradePerformance,

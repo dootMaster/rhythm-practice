@@ -269,6 +269,14 @@ test("percent rounds part/whole, 0 when nothing possible", () => {
   assert.equal(R.percent(5, 0), 0);   // no division by zero
 });
 
+test("pushRecent prepends newest-first and caps the list", () => {
+  let h = [];
+  for (let i = 1; i <= 12; i++) h = R.pushRecent(h, i, 10);
+  assert.equal(h.length, 10);
+  assert.equal(h[0], 12);  // newest first
+  assert.equal(h[9], 3);   // oldest kept (1 and 2 dropped)
+});
+
 // ---------------------------------------------------------------------------
 // multi-note selection grading
 // ---------------------------------------------------------------------------

@@ -18,6 +18,8 @@ Open `index.html` directly — no build, no server.
 - **Ear** — a phrase of N notes plays **once**; click every 16th you heard, then Submit. Replays cost points (active recall).
 - **Read** — a rhythm in standard notation (rests merged into the largest beat-aligned values). **New phrase** shows the notation silently; **Perform** counts you in in the meter (1·2·3·4, distinct woodblock), then records your taps for one bar, stops, and grades early / on-time / late. A marker lane under the staff plots each note (gray tick) against your tap (colored dot, offset left = early / right = late; red tick = stray tap). **Tolerance** (Loose / Normal / Strict) sets the perfect/good timing windows. No auto-advance — Perform again (costs points) or New phrase. Best attempt per phrase is banked.
 
+A hidden **History** popover (📊, bottom bar) logs your last 10 submissions — mode, note count, score %, and time taken — persisted in localStorage.
+
 Difficulty (Easy/Med/Hard = 2/3/4 notes, all on the full 16th grid) drives Ear + Read. Scoring is an **accuracy %** (credit earned ÷ credit possible, weighted by note count). A phrase's credit ceiling halves per replay (Worth 100% → 50% → 25%); your answer's correctness scales it. Read banks the best attempt per phrase.
 
 ## Run the tests
