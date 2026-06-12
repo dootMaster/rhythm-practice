@@ -348,7 +348,6 @@
     <div class="quiz-bar">
       <button id="readNew" class="primary">New phrase</button>
       <button id="readGo" disabled>▶ Perform</button>
-      <button id="calibrate">🎚 Calibrate</button>
       <span class="worth">Worth <b class="js-worth">100</b>%</span>
       <span class="score"><b class="js-score">—</b> accuracy · <b class="js-phrases">0</b> phrases</span>
       <span class="feedback" id="readFeedback"></span>
@@ -419,8 +418,6 @@
   let holds = [];                // [{press, release}] in audio-clock seconds
   let pendingPress = null;       // press time of a key/pad currently held down
   let tapWindowOpen = false;     // presses only count during the phrase bar
-  let calibrationMs = 0;         // measured input/output latency to subtract from taps
-  let calibrating = false, calBeats = [], calTaps = [], calTimer = null;
   let attempted = false;         // has the current read phrase been performed once?
   let phraseBanked = 0;          // best points already banked for the current phrase
   let phraseCounted = false;     // has this phrase been counted in the phrase total?
@@ -874,30 +871,15 @@
   }
 
   // ========== Read performance (press + hold) ==========
-  // You tap to the SOUND, which reaches your ears after the scheduled time
-  // (output + input latency + your bias). Calibration measures that offset and
-  // we subtract it so an in-time tap reads as on-time.
-  function tapClock() {
-    return ctx.currentTime - calibrationMs / 1000;
-  }
-  function flashPad() {
-    const p = $("tapPad");
-    p.classList.add("flash"); setTimeout(() => p.classList.remove("flash"), 70);
-  }
   function pressTap() {
-    if (calibrating) {           // tap-along calibration: record raw tap times
-      calTaps.push(ctx.currentTime * 1000);
-      flashPad(); click(ctx.currentTime + 0.001, 1100, 0.22, 0.03);
-      return;
-    }
     if (mode !== "read" || !tapWindowOpen || pendingPress !== null) return;
-    pendingPress = tapClock();
+    pendingPress = ctx.currentTime;
     $("tapPad").classList.add("held");
     click(ctx.currentTime + 0.001, 1100, 0.22, 0.03); // hear your attack
   }
   function releaseTap() {
     if (pendingPress === null) return;
-    holds.push({ press: pendingPress, release: tapClock() });
+    holds.push({ press: pendingPress, release: ctx.currentTime });
     pendingPress = null;
     $("tapPad").classList.remove("held");
   }
@@ -905,7 +887,7 @@
     if (!phrase.length) return;
     phraseAnswered = true;
     if (pendingPress !== null) {  // still holding at the end — close it
-      holds.push({ press: pendingPress, release: tapClock() });
+      holds.push({ press: pendingPress, release: ctx.currentTime });
       pendingPress = null; $("tapPad").classList.remove("held");
     }
     const dt = secondsPer16th(), total = steps(), barMs = total * dt * 1000;
@@ -917,7 +899,7 @@
       .map(h => ({ press: (h.press - phraseStartTime) * 1000, release: (h.release - phraseStartTime) * 1000 }))
       .filter(iv => iv.press >= -180);     // drop count-in noodling
     const windows = R.timingWindows(tolerance);
-    const g = R.gradeHolds(notesMs, intervalsMs, windows, 300); // <300ms notes are tap-only
+    const g = R.gradeHolds(notesMs, intervalsMs, windows);
     renderHoldMarkers(notesMs, g, barMs);  // show where you landed + how long you held
     const base = R.basePoints(phrase.length);
     const earned = Math.round(R.pointsAvailable(base, replays) * g.fraction);
@@ -937,40 +919,6 @@
     msg += "  →  " + R.percent(earned, base) + "%";
     const clean = onTime === n && held === n && g.extra === 0;
     setFeedback("readFeedback", msg, clean ? "ok" : "no");
-  }
-
-  // ========== Latency calibration (tap along to the metronome) ==========
-  function startCalibration() {
-    ensureCtx();
-    stopLoop();
-    if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
-    if (calTimer) { clearTimeout(calTimer); calTimer = null; }
-    calibrating = true; calBeats = []; calTaps = [];
-    const dt = 60 / 100;                 // steady quarter notes at 100 BPM
-    let t = ctx.currentTime + 0.4;
-    for (let i = 0; i < 4; i++) { countClick(t, i === 0); t += dt; }   // count-in (woodblock)
-    for (let i = 0; i < 8; i++) { click(t, 1300, 0.5, 0.05); calBeats.push(t * 1000); t += dt; } // tap to these
-    $("tapPad").disabled = false;
-    $("readGo").disabled = true;
-    setFeedback("readFeedback", "Count-in, then tap along with the 8 clicks…", "");
-    calTimer = setTimeout(finishCalibration, (t - ctx.currentTime) * 1000 + 250);
-  }
-  function finishCalibration() {
-    calibrating = false;
-    $("tapPad").disabled = true;
-    $("readGo").disabled = !phrase.length;
-    if (calTaps.length >= 4) {
-      calibrationMs = Math.round(R.calibrationOffset(calBeats, calTaps, 300));
-      try { localStorage.setItem("rhythm-cal", String(calibrationMs)); } catch (_) {}
-      setFeedback("readFeedback", "Calibrated: " + calibrationMs + " ms (" + calTaps.length + " taps)", "ok");
-    } else {
-      setFeedback("readFeedback", "Need a few more taps — try Calibrate again", "no");
-    }
-    updateCalLabel();
-  }
-  function updateCalLabel() {
-    const b = $("calibrate");
-    if (b) b.textContent = "🎚 Calibrate" + (calibrationMs ? " (" + calibrationMs + "ms)" : "");
   }
 
   // ========== Notation (VexFlow) ==========
@@ -1152,7 +1100,6 @@
   $("earSubmit").addEventListener("click", submitEar);
   $("readNew").addEventListener("click", () => freshPhrase(false)); // show notation, no audio
   $("readGo").addEventListener("click", performRead);
-  $("calibrate").addEventListener("click", startCalibration);
   // tap pad: press + hold + release (pointer covers mouse & touch)
   const pad = $("tapPad");
   pad.addEventListener("pointerdown", e => { e.preventDefault(); pressTap(); });
@@ -1226,8 +1173,6 @@
   $("historyClose").addEventListener("click", () => { $("historyPanel").style.display = "none"; });
   try { history = JSON.parse(localStorage.getItem("rhythm-history")) || []; } catch (_) { history = []; }
   renderHistory();
-  try { calibrationMs = parseInt(localStorage.getItem("rhythm-cal"), 10) || 0; } catch (_) { calibrationMs = 0; }
-  updateCalLabel();
   let savedTheme = null;
   try { savedTheme = localStorage.getItem("rhythm-theme"); } catch (_) {}
   if (savedTheme) applyTheme(savedTheme === "dark");

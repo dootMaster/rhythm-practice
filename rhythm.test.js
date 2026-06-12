@@ -391,26 +391,6 @@ test("gradeHolds grades onset AND hold length", () => {
   assert.equal(r.extra, 1);
 });
 
-test("gradeHolds: short notes are tap-only (hold not penalized)", () => {
-  const shortNote = [{ start: 0, end: 150 }]; // 150ms note, below the 300ms threshold
-  // tapped on time, released quickly (would be 'good' if graded) -> hold perfect, full credit
-  const r = R.gradeHolds(shortNote, [{ press: 5, release: 90 }], { perfect: 55, good: 130 }, 300);
-  assert.equal(r.perNote[0].onset, "perfect");
-  assert.equal(r.perNote[0].hold, "perfect");
-  assert.equal(r.perNote[0].tapOnly, true);
-  assert.ok(Math.abs(r.fraction - 1) < 1e-9);
-});
-
-test("calibrationOffset = median tap-minus-beat, ignoring misfires", () => {
-  const beats = [0, 600, 1200, 1800];
-  // taps consistently ~40ms late
-  assert.ok(Math.abs(R.calibrationOffset(beats, [42, 640, 1235, 1838], 300) - 40) < 8);
-  // a wild outlier beyond the window is dropped
-  assert.ok(Math.abs(R.calibrationOffset(beats, [42, 640, 5000], 300) - 41) < 5);
-  // no usable taps -> 0
-  assert.equal(R.calibrationOffset(beats, [], 300), 0);
-});
-
 test("timingWindows gives looser/tighter perfect+good windows", () => {
   assert.deepEqual(R.timingWindows("loose"), { perfect: 90, good: 200 });
   assert.deepEqual(R.timingWindows("normal"), { perfect: 55, good: 130 });

@@ -46,8 +46,7 @@ covered by tests (don't let these silently change):
 - notation durations (`barNotes`) — real note values + ties via a metric decomposition, not stacked 16ths
 - points: `basePoints`, `pointsAvailable` (replay halving)
 - multi-note grading (`gradeSelection`)
-- read-mode timing (`classifyTiming`, `gradePerformance`, `gradeHolds` press+hold grading w/ tap-only threshold, `timingWindows`)
-- latency calibration (`calibrationOffset`) — tap-along to the metronome, median offset subtracted from taps
+- read-mode timing (`classifyTiming`, `gradePerformance` incl. stray-tap reporting, `timingWindows`)
 
 Examples of features that fit this pattern: swing/shuffle (extend `secondsPer16th`
 into a per-step offset fn), accent patterns, triplet mode (generalize the `4`),
