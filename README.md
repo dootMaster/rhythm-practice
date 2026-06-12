@@ -20,7 +20,7 @@ Open `index.html` directly — no build, no server.
 
 A hidden **History** popover (📊, bottom bar) logs your last 10 submissions — mode, note count, score %, and time taken — persisted in localStorage.
 
-Difficulty sets a per-phrase note-count range (uniform random within the band), all on the full 16th grid: One (1), Easy (1–4), Medium (4–8), Hard (8–16), Random (1–16). Drives Ear + Read. Scoring is an **accuracy %** (credit earned ÷ credit possible, weighted by note count). A phrase's credit ceiling halves per replay (Worth 100% → 50% → 25%); your answer's correctness scales it. Read banks the best attempt per phrase.
+Difficulty sets a per-phrase note-count range, all on the full 16th grid: One (1), Easy (1–4), Medium (4–8), Hard (8–16), Random (1–16). The count is **biased toward the sparse end** of each band (min of two draws), so trainable sparse patterns dominate and near-full "rolls" are rare but possible. Drives Ear + Read. Scoring is an **accuracy %** (credit earned ÷ credit possible, weighted by note count). A phrase's credit ceiling halves per replay (Worth 100% → 50% → 25%); your answer's correctness scales it. Read banks the best attempt per phrase.
 
 ## Run the tests
 

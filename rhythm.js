@@ -162,11 +162,15 @@
   };
   function difficultyRange(level) { return DIFFICULTY[level] || DIFFICULTY.easy; }
 
-  // Pick a note count uniformly within the level's range. rng for tests.
+  // Pick a note count within the level's range, biased toward the sparse (low)
+  // end: taking min of two uniforms skews low, so sparse "feel"-trainable
+  // patterns are common and near-full rolls (e.g. 15-16 notes) are rare but
+  // still possible. rng for tests.
   function noteCountFor(level, rng) {
     rng = rng || Math.random;
     var r = difficultyRange(level);
-    return r.min + Math.floor(rng() * (r.max - r.min + 1));
+    var u = Math.min(rng(), rng());
+    return r.min + Math.floor(u * (r.max - r.min + 1));
   }
 
   // Random phrase: `noteCount` distinct 16th steps within a bar of `totalSteps`,

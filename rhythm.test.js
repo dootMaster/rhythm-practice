@@ -223,6 +223,20 @@ test("noteCountFor picks within the level's inclusive range", () => {
   for (let n = 0; n < 30; n++) { const c = R.noteCountFor("medium", rng); assert.ok(c >= 4 && c <= 8); }
 });
 
+test("noteCountFor biases toward the sparse end (min of two draws)", () => {
+  // one high + one low draw -> takes the low one, so count stays near the floor
+  const lowThenHigh = [0.1, 0.9]; let i = 0;
+  assert.equal(R.noteCountFor("hard", () => lowThenHigh[i++ % 2]), 8); // min(0.1,0.9)=0.1 -> 8
+  // both high needed to reach the top of the band
+  assert.equal(R.noteCountFor("hard", () => 0.99), 16);
+  // statistical skew: mean over uniform draws sits below the band midpoint (12)
+  let seed = 1234567, total = 0, N = 4000;
+  const prng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let n = 0; n < N; n++) total += R.noteCountFor("hard", prng);
+  const mean = total / N;
+  assert.ok(mean < 11.5, "expected sparse-biased mean (<11.5), got " + mean);
+});
+
 test("randomPattern returns the right count of distinct, sorted, in-range steps", () => {
   // deterministic rng cycling through fixed values
   const seq = [0.1, 0.9, 0.3, 0.5, 0.7, 0.2];
