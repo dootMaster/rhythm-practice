@@ -370,27 +370,6 @@ test("gradePerformance penalizes extra taps and reports them", () => {
   assert.ok(Math.abs(r.fraction - 0.5) < 1e-9); // (1 - 0.25*2)/1
 });
 
-test("gradeHolds grades onset AND hold length", () => {
-  const notes = [{ start: 0, end: 1000 }]; // one note, held for 1s
-  // pressed on time, released on time -> perfect onset + perfect hold
-  let r = R.gradeHolds(notes, [{ press: 10, release: 990 }]);
-  assert.equal(r.perNote[0].onset, "perfect");
-  assert.equal(r.perNote[0].hold, "perfect");
-  assert.ok(Math.abs(r.fraction - 1) < 1e-9);
-  // on-time onset but released way too early (staccato) -> onset perfect, hold miss
-  r = R.gradeHolds(notes, [{ press: 10, release: 500 }]);
-  assert.equal(r.perNote[0].onset, "perfect");
-  assert.equal(r.perNote[0].hold, "miss");
-  assert.ok(Math.abs(r.fraction - 0.6) < 1e-9); // 0.6*1 + 0.4*0
-  // never pressed -> miss
-  r = R.gradeHolds(notes, []);
-  assert.equal(r.perNote[0].matched, false);
-  assert.equal(r.fraction, 0);
-  // an extra stray press is reported and penalizes
-  r = R.gradeHolds(notes, [{ press: 5, release: 995 }, { press: 1500, release: 1600 }]);
-  assert.equal(r.extra, 1);
-});
-
 test("timingWindows gives looser/tighter perfect+good windows", () => {
   assert.deepEqual(R.timingWindows("loose"), { perfect: 90, good: 200 });
   assert.deepEqual(R.timingWindows("normal"), { perfect: 55, good: 130 });

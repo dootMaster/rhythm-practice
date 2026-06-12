@@ -228,11 +228,6 @@
   .tap-mark.good { background: var(--color-peek); }
   .tap-mark.miss { top: 8px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--color-wrong); }
   .tap-mark.extra { top: 4px; width: 2px; height: 15px; background: var(--color-wrong); }
-  /* held-note bars: gray = target duration, colored = how long you held */
-  .tap-mark.span, .tap-mark.hold { transform: none; }
-  .tap-mark.span { top: 2px; height: 3px; background: var(--text-muted); opacity: 0.4; border-radius: 2px; }
-  .tap-mark.hold { top: 9px; height: 8px; border-radius: 4px; opacity: 0.9; }
-  .tap-mark.hold.off { background: var(--color-wrong); }
   .tap-pad {
     display: block; width: 100%; max-width: 340px; margin: 0.1rem auto 0;
     padding: 1.05rem; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.08em;
@@ -240,7 +235,7 @@
     transition: transform 0.05s ease, background-color 0.08s ease;
   }
   .tap-pad:hover { background: #4f46e5; }
-  .tap-pad.flash, .tap-pad.held { transform: scale(0.97); background: var(--color-to); }
+  .tap-pad.flash { transform: scale(0.97); background: var(--color-to); }
   .tap-pad:disabled { opacity: 0.4; }
   .tap-pad:disabled:hover { background: var(--color-from); }
   .tap-hint { font-size: 0.7rem; font-weight: 400; opacity: 0.82; margin-left: 0.45rem; }
@@ -357,11 +352,11 @@
       <div id="readCue" class="read-cue"></div>
     </div>
     <div id="tapLane" class="tap-lane"></div>
-    <button id="tapPad" class="tap-pad" disabled>TAP &amp; HOLD<span class="tap-hint">or Spacebar</span></button>
+    <button id="tapPad" class="tap-pad" disabled>TAP<span class="tap-hint">or Spacebar</span></button>
     <p class="hint">
-      Read the rhythm, hit <b>Perform</b>: it counts you in (1·2·3·4), then <b>press and hold</b> each note
-      for its full length (short notes = quick taps, long notes = hold). Graded on both timing and hold length.
-      Bars below the staff show the target duration (gray) vs. your hold. Set <b>Tolerance</b> for strictness.
+      Read the rhythm, hit <b>Perform</b>: it counts you in (1·2·3·4), then tap each note in time — each hit
+      is graded early / on-time / late. Markers below the staff show where you landed (dot left of the
+      note = early, right = late). Set <b>Tolerance</b> for how tight the timing must be.
     </p>
   </div>
 
@@ -414,10 +409,9 @@
   let history = [];              // last 10 submissions {mode, pct, notes, seconds}
   let submissionStart = 0;       // perf-clock ms when the current attempt began
 
-  // read mode performance capture (press + release, so we can grade hold length)
-  let holds = [];                // [{press, release}] in audio-clock seconds
-  let pendingPress = null;       // press time of a key/pad currently held down
-  let tapWindowOpen = false;     // presses only count during the phrase bar
+  // read mode performance capture
+  let tapTimes = [];             // audio-clock seconds of each tap
+  let tapWindowOpen = false;     // taps only count during the phrase bar
   let attempted = false;         // has the current read phrase been performed once?
   let phraseBanked = 0;          // best points already banked for the current phrase
   let phraseCounted = false;     // has this phrase been counted in the phrase total?
@@ -712,7 +706,7 @@
       t += dt;
     }
     phraseEndTime = t;
-    if (mode === "read") { holds = []; pendingPress = null; }
+    if (mode === "read") tapTimes = [];
     phraseActive = true; isPlaying = true;
     if (!rafId) draw();
     // open the tap window when the phrase bar begins (small lead for early taps)
@@ -750,7 +744,7 @@
     phraseActive = false; tapWindowOpen = false;
     phrase = R.randomPattern(R.noteCountFor(difficulty, Math.random), steps(), Math.random);
     phraseSet = new Set(phrase);
-    replays = 0; phraseAnswered = false; earSelection = new Set(); holds = []; pendingPress = null;
+    replays = 0; phraseAnswered = false; earSelection = new Set(); tapTimes = [];
     attempted = false; phraseBanked = 0; phraseCounted = false;
     submissionStart = performance.now();   // clock starts when the phrase is presented
     updatePoints();
@@ -870,37 +864,25 @@
     // No auto-advance — it stays put. Click New phrase when you're ready.
   }
 
-  // ========== Read performance (press + hold) ==========
-  function pressTap() {
-    if (mode !== "read" || !tapWindowOpen || pendingPress !== null) return;
-    pendingPress = ctx.currentTime;
-    $("tapPad").classList.add("held");
-    click(ctx.currentTime + 0.001, 1100, 0.22, 0.03); // hear your attack
-  }
-  function releaseTap() {
-    if (pendingPress === null) return;
-    holds.push({ press: pendingPress, release: ctx.currentTime });
-    pendingPress = null;
-    $("tapPad").classList.remove("held");
+  // ========== Read performance ==========
+  function registerTap() {
+    if (mode !== "read" || !tapWindowOpen) return;
+    tapTimes.push(ctx.currentTime);
+    const pad = $("tapPad");
+    pad.classList.add("flash"); setTimeout(() => pad.classList.remove("flash"), 80);
+    click(ctx.currentTime + 0.001, 1100, 0.22, 0.03); // hear your own tap
   }
   function gradeRead() {
     if (!phrase.length) return;
     phraseAnswered = true;
-    if (pendingPress !== null) {  // still holding at the end — close it
-      holds.push({ press: pendingPress, release: ctx.currentTime });
-      pendingPress = null; $("tapPad").classList.remove("held");
-    }
-    const dt = secondsPer16th(), total = steps(), barMs = total * dt * 1000;
-    const notesMs = phrase.map((s, i) => ({
-      start: s * dt * 1000,
-      end: (i + 1 < phrase.length ? phrase[i + 1] : total) * dt * 1000,
-    }));
-    const intervalsMs = holds
-      .map(h => ({ press: (h.press - phraseStartTime) * 1000, release: (h.release - phraseStartTime) * 1000 }))
-      .filter(iv => iv.press >= -180);     // drop count-in noodling
+    const dt = secondsPer16th();
+    const noteTimesMs = phrase.map(s => s * dt * 1000);          // relative to phrase start
+    const tapMs = tapTimes
+      .map(t => (t - phraseStartTime) * 1000)
+      .filter(ms => ms >= -180);                                  // drop count-in noodling
     const windows = R.timingWindows(tolerance);
-    const g = R.gradeHolds(notesMs, intervalsMs, windows);
-    renderHoldMarkers(notesMs, g, barMs);  // show where you landed + how long you held
+    const g = R.gradePerformance(noteTimesMs, tapMs, windows);
+    renderTapMarkers(g.perNote, g.extraTaps, steps() * dt * 1000); // show where you landed
     const base = R.basePoints(phrase.length);
     const earned = Math.round(R.pointsAvailable(base, replays) * g.fraction);
     // Bank the best attempt once per phrase (don't stack credit across replays).
@@ -908,16 +890,15 @@
     if (!phraseCounted) { possibleTotal += base; phrasesDone++; phraseCounted = true; }
     updatePoints();
     recordSubmission("read", R.percent(earned, base));
-    let onTime = 0, held = 0;
-    g.perNote.forEach(p => {
-      if (p.onset === "perfect" || p.onset === "good") onTime++;
-      if (p.hold === "perfect" || p.hold === "good") held++;
-    });
-    const n = phrase.length;
-    let msg = "Timing " + onTime + "/" + n + " · Hold " + held + "/" + n;
-    if (g.extra) msg += " · " + g.extra + " extra";
+    const counts = { perfect: 0, good: 0, miss: 0 };
+    g.perNote.forEach(p => counts[p.grade]++);
+    let msg = "Perfect ×" + counts.perfect;
+    if (counts.good) msg += " · Good ×" + counts.good;
+    if (counts.miss) msg += " · Missed ×" + counts.miss;
+    if (g.falsePos) msg += " · " + g.falsePos + " extra";
     msg += "  →  " + R.percent(earned, base) + "%";
-    const clean = onTime === n && held === n && g.extra === 0;
+    const clean = counts.miss === 0 && g.falsePos === 0;
+    // No auto-advance in read mode: it stops and waits. Perform again or New phrase.
     setFeedback("readFeedback", msg, clean ? "ok" : "no");
   }
 
@@ -1015,9 +996,8 @@
     return a[a.length - 1].x;
   }
 
-  // Under the staff: a gray bar per note = its target duration; a colored bar =
-  // how long you actually held (left edge = your onset, length = your hold).
-  function renderHoldMarkers(notes, g, barMs) {
+  // Draw the gray note ticks + your colored tap dots under the staff.
+  function renderTapMarkers(perNote, extraTaps, barMs) {
     const lane = $("tapLane");
     lane.innerHTML = "";
     const svg = $("notation").querySelector("svg");
@@ -1026,25 +1006,22 @@
     const svgRect = svg.getBoundingClientRect();
     const scale = svgRect.width / readRenderWidth;
     const leftOff = svgRect.left - laneRect.left;
-    const xAt = ms => leftOff + notationX(Math.max(0, Math.min(1, ms / barMs))) * scale;
-    const el = (cls, leftPx, widthPx) => {
+    const px = xSvg => leftOff + xSvg * scale;
+    const pxPerMs = (px(notationX(1)) - px(notationX(0))) / barMs;
+    const total = steps();
+    const mark = (cls, leftPx) => {
       const d = document.createElement("div");
       d.className = "tap-mark " + cls;
       d.style.left = leftPx + "px";
-      if (widthPx != null) d.style.width = Math.max(2, widthPx) + "px";
       lane.appendChild(d);
     };
-    notes.forEach((nt, i) => {
-      const sx = xAt(nt.start), ex = xAt(nt.end);
-      el("span", sx, ex - sx);                       // target duration (gray)
-      const p = g.perNote[i];
-      if (!p.matched) { el("miss", sx); return; }    // never played
-      const cls = (p.hold === "perfect" || p.hold === "good")
-        ? (p.onset === "perfect" && p.hold === "perfect" ? "perfect" : "good")
-        : "off";
-      el("hold " + cls, xAt(p.press), xAt(p.release) - xAt(p.press)); // your hold
+    perNote.forEach((p, i) => {
+      const noteX = px(notationX(phrase[i] / total));
+      mark("target", noteX);                                   // where the note is
+      if (p.grade === "miss") mark("miss", noteX);             // you didn't tap it
+      else mark("dot " + p.grade, noteX + p.deltaMs * pxPerMs); // your tap, offset by error
     });
-    g.extraIntervals.forEach(iv => el("extra", xAt(iv.press)));        // stray presses
+    extraTaps.forEach(ms => mark("extra", px(notationX(ms / barMs)))); // stray taps
   }
 
   // ========== Wiring ==========
@@ -1100,12 +1077,7 @@
   $("earSubmit").addEventListener("click", submitEar);
   $("readNew").addEventListener("click", () => freshPhrase(false)); // show notation, no audio
   $("readGo").addEventListener("click", performRead);
-  // tap pad: press + hold + release (pointer covers mouse & touch)
-  const pad = $("tapPad");
-  pad.addEventListener("pointerdown", e => { e.preventDefault(); pressTap(); });
-  pad.addEventListener("pointerup", releaseTap);
-  pad.addEventListener("pointerleave", releaseTap);
-  pad.addEventListener("pointercancel", releaseTap);
+  $("tapPad").addEventListener("click", registerTap);
 
   function setMode(m) {
     stopLoop();
@@ -1147,13 +1119,9 @@
     e.preventDefault();
     const ae = document.activeElement;
     if (ae && ae.tagName === "BUTTON") ae.blur();
-    if (e.repeat) return;            // key-repeat is the held key, not a new press
-    if (mode === "read") pressTap();
+    if (e.repeat) return;            // discrete presses only
+    if (mode === "read") registerTap();
     else if (mode === "explore") toggleLoop();
-  });
-  // spacebar release ends the held note in read mode
-  document.addEventListener("keyup", e => {
-    if (e.code === "Space" && mode === "read") releaseTap();
   });
 
   // theme (light default, matches keyframeguitar; persisted)
