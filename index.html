@@ -933,7 +933,24 @@
       sn.setStyle({ fillStyle: color, strokeStyle: color });
       return sn;
     });
-    const beams = VF.Beam.generateBeams(notes, { groups: [new VF.Fraction(1, 4)] });
+    // Beam by beat: walk pieces tracking their slot position and group runs of
+    // consecutive beamable notes (8th/16th) that fall in the SAME beat. This
+    // keeps beams from ever crossing a beat boundary (VexFlow's auto-grouping
+    // miscounts when rests/dotted notes shift the offset).
+    const SLOTLEN = { w: 16, h: 8, q: 4, "8": 2, "16": 1 };
+    const beams = [];
+    let run = [], runBeat = -1, slot = 0;
+    const flushRun = () => { if (run.length >= 2) beams.push(new VF.Beam(run)); run = []; };
+    items.forEach((it, i) => {
+      const startSlot = slot;
+      slot += SLOTLEN[it.dur] * (it.dots ? 1.5 : 1);
+      const beamable = !it.isRest && (it.dur === "8" || it.dur === "16");
+      const beat = Math.floor(startSlot / 4);
+      if (!beamable) { flushRun(); runBeat = -1; return; }
+      if (run.length && beat === runBeat) run.push(notes[i]);
+      else { flushRun(); run = [notes[i]]; runBeat = beat; }
+    });
+    flushRun();
     // Ties between pieces of the same held note.
     const ties = [];
     items.forEach((it, i) => {
