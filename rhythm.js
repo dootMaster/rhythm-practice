@@ -346,9 +346,11 @@
   // Grade held notes: match each notated note {start,end} to a press/release
   // interval {press,release} (matched by press proximity to start), then grade
   // BOTH the onset (press vs start) and the hold release (release vs end).
-  // Score weights onset 60% / hold 40%. Returns rich perNote for plotting.
-  function gradeHolds(notes, intervals, windows) {
+  // Notes shorter than minHoldMs are "tap-only": hold isn't penalized (you
+  // can't meaningfully hold a 16th). Score weights onset 60% / hold 40%.
+  function gradeHolds(notes, intervals, windows, minHoldMs) {
     windows = windows || { perfect: 55, good: 130 };
+    minHoldMs = minHoldMs || 0;
     var used = [];
     var perNote = notes.map(function (nt) {
       var bestIdx = -1, bestAbs = Infinity;
@@ -363,10 +365,11 @@
       used[bestIdx] = true;
       var iv = intervals[bestIdx];
       var od = iv.press - nt.start, rd = iv.release - nt.end;
+      var tapOnly = (nt.end - nt.start) < minHoldMs;
       return {
-        matched: true, press: iv.press, release: iv.release,
+        matched: true, press: iv.press, release: iv.release, tapOnly: tapOnly,
         onset: classifyTiming(od, windows).grade, onsetDelta: od,
-        hold: classifyTiming(rd, windows).grade, releaseDelta: rd,
+        hold: tapOnly ? "perfect" : classifyTiming(rd, windows).grade, releaseDelta: rd,
       };
     });
     var extraIntervals = intervals.filter(function (_, i) { return !used[i]; });
@@ -379,6 +382,26 @@
       ? Math.max(0, Math.min(1, (score - 0.25 * extraIntervals.length) / notes.length))
       : 0;
     return { perNote: perNote, fraction: fraction, extra: extraIntervals.length, extraIntervals: extraIntervals };
+  }
+
+  // Calibration: given the scheduled beat times and the user's tap times (same
+  // clock, ms), return the median (tap - nearest beat) offset = their latency.
+  // Taps further than maxAbs from any beat are ignored as misfires.
+  function calibrationOffset(beats, taps, maxAbs) {
+    maxAbs = maxAbs || Infinity;
+    var deltas = [];
+    taps.forEach(function (t) {
+      var best = null, bestAbs = Infinity;
+      beats.forEach(function (b) {
+        var d = t - b, a = Math.abs(d);
+        if (a < bestAbs) { bestAbs = a; best = d; }
+      });
+      if (best !== null && Math.abs(best) <= maxAbs) deltas.push(best);
+    });
+    if (!deltas.length) return 0;
+    deltas.sort(function (a, b) { return a - b; });
+    var m = Math.floor(deltas.length / 2);
+    return deltas.length % 2 ? deltas[m] : (deltas[m - 1] + deltas[m]) / 2;
   }
 
   var Rhythm = {
@@ -409,6 +432,7 @@
     classifyTiming: classifyTiming,
     gradePerformance: gradePerformance,
     gradeHolds: gradeHolds,
+    calibrationOffset: calibrationOffset,
     timingWindows: timingWindows,
   };
 
