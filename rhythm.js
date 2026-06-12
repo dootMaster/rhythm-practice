@@ -343,6 +343,44 @@
     return { perNote: perNote, fraction: fraction, falsePos: falsePos, extraTaps: extraTaps };
   }
 
+  // Grade held notes: match each notated note {start,end} to a press/release
+  // interval {press,release} (matched by press proximity to start), then grade
+  // BOTH the onset (press vs start) and the hold release (release vs end).
+  // Score weights onset 60% / hold 40%. Returns rich perNote for plotting.
+  function gradeHolds(notes, intervals, windows) {
+    windows = windows || { perfect: 55, good: 130 };
+    var used = [];
+    var perNote = notes.map(function (nt) {
+      var bestIdx = -1, bestAbs = Infinity;
+      for (var i = 0; i < intervals.length; i++) {
+        if (used[i]) continue;
+        var d = Math.abs(intervals[i].press - nt.start);
+        if (d < bestAbs) { bestAbs = d; bestIdx = i; }
+      }
+      if (bestIdx < 0 || bestAbs > windows.good) {
+        return { matched: false, onset: "miss", hold: "miss", press: null, release: null, onsetDelta: null, releaseDelta: null };
+      }
+      used[bestIdx] = true;
+      var iv = intervals[bestIdx];
+      var od = iv.press - nt.start, rd = iv.release - nt.end;
+      return {
+        matched: true, press: iv.press, release: iv.release,
+        onset: classifyTiming(od, windows).grade, onsetDelta: od,
+        hold: classifyTiming(rd, windows).grade, releaseDelta: rd,
+      };
+    });
+    var extraIntervals = intervals.filter(function (_, i) { return !used[i]; });
+    var score = perNote.reduce(function (s, p) {
+      var o = p.onset === "perfect" ? 1 : p.onset === "good" ? 0.5 : 0;
+      var h = p.hold === "perfect" ? 1 : p.hold === "good" ? 0.5 : 0;
+      return s + 0.6 * o + 0.4 * h;
+    }, 0);
+    var fraction = notes.length
+      ? Math.max(0, Math.min(1, (score - 0.25 * extraIntervals.length) / notes.length))
+      : 0;
+    return { perNote: perNote, fraction: fraction, extra: extraIntervals.length, extraIntervals: extraIntervals };
+  }
+
   var Rhythm = {
     SUB_LABELS: SUB_LABELS,
     SUB_SUBLABELS: SUB_SUBLABELS,
@@ -370,6 +408,7 @@
     gradeSelection: gradeSelection,
     classifyTiming: classifyTiming,
     gradePerformance: gradePerformance,
+    gradeHolds: gradeHolds,
     timingWindows: timingWindows,
   };
 
