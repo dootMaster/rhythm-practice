@@ -920,28 +920,45 @@
     const stave = new VF.Stave(8, 14, width - 16);
     stave.addTimeSignature(beatsPerBar + "/4");
     stave.setContext(c).draw();
-    const items = R.barDurations(pattern, beatsPerBar);
+    // Real durations: each note lasts to the next onset (ties across beats),
+    // rests only before the first note.
+    const items = R.barNotes(pattern, beatsPerBar);
     const notes = items.map(it => {
-      const sn = it.isRest
-        ? new VF.StaveNote({ keys: ["b/4"], duration: it.dur })
-        : new VF.StaveNote({ keys: ["b/4"], duration: "16", stemDirection: 1 });
+      const sn = new VF.StaveNote({
+        keys: ["b/4"],
+        duration: it.isRest ? it.dur + "r" : it.dur,
+        stemDirection: 1,
+      });
+      if (it.dots) VF.Dot.buildAndAttach([sn], { all: true });
       sn.setStyle({ fillStyle: color, strokeStyle: color });
       return sn;
     });
     const beams = VF.Beam.generateBeams(notes, { groups: [new VF.Fraction(1, 4)] });
+    // Ties between pieces of the same held note.
+    const ties = [];
+    items.forEach((it, i) => {
+      if (it.tie && notes[i + 1]) {
+        ties.push(new VF.StaveTie({
+          first_note: notes[i], last_note: notes[i + 1],
+          first_indices: [0], last_indices: [0],
+        }));
+      }
+    });
     VF.Formatter.FormatAndDraw(c, stave, notes);
     beams.forEach(b => {
       b.setContext(c);
       if (b.setStyle) b.setStyle({ fillStyle: color, strokeStyle: color });
       b.draw();
     });
+    ties.forEach(t => t.setContext(c).draw());
 
     // Build time-fraction -> notation-x anchors so we can plot tap markers later.
+    // Only a note's first piece (the onset) carries a step.
     const total = steps();
     readRenderWidth = width;
     readAnchors = [{ f: 0, x: stave.getNoteStartX() }];
     items.forEach((it, i) => {
-      if (!it.isRest) readAnchors.push({ f: it.step / total, x: notes[i].getAbsoluteX() });
+      if (it.step != null) readAnchors.push({ f: it.step / total, x: notes[i].getAbsoluteX() });
     });
     readAnchors.push({ f: 1, x: stave.getNoteEndX() });
     readAnchors.sort((a, b) => a.f - b.f);

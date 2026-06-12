@@ -255,24 +255,32 @@ test("randomPattern clamps noteCount to the bar size", () => {
   assert.deepEqual(p, [0, 1, 2, 3, 4, 5, 6, 7]);
 });
 
-test("barDurations merges empty slots into the largest aligned rests", () => {
+test("barNotes notates real durations: notes last until the next onset, with ties", () => {
+  // encode each piece: (rest? dur+"r" : dur) + ("." if dotted) + ("~" if tied to next)
   const seq = (pattern, beats) =>
-    R.barDurations(pattern, beats).map(x => (x.isRest ? x.dur : "n" + x.step));
+    R.barNotes(pattern, beats).map(p =>
+      (p.isRest ? p.dur + "r" : p.dur) + (p.dots ? "." : "") + (p.tie ? "~" : ""));
 
-  // empty beat -> one quarter rest, not four 16th rests
-  assert.deepEqual(seq([], 1), ["qr"]);
-  // empty 4/4 -> four quarter rests
-  assert.deepEqual(seq([], 4), ["qr", "qr", "qr", "qr"]);
-  // onset on the beat, rest of beat empty -> note + 16th rest + 8th rest (binary, aligned)
-  assert.deepEqual(seq([0], 1), ["n0", "16r", "8r"]);
-  // onsets on "1" and "&" -> note, 16th rest, note, 16th rest
-  assert.deepEqual(seq([0, 2], 1), ["n0", "16r", "n2", "16r"]);
-  // full beat of 16ths -> four notes, no rests
-  assert.deepEqual(seq([0, 1, 2, 3], 1), ["n0", "n1", "n2", "n3"]);
-  // second beat starts on its downbeat -> first beat collapses to one quarter rest
-  assert.deepEqual(seq([4], 2), ["qr", "n4", "16r", "8r"]);
-  // a single "e" -> 16th rest, note, 8th rest (rest after merges)
-  assert.deepEqual(seq([1], 1), ["16r", "n1", "8r"]);
+  // empty bars collapse to the largest rest
+  assert.deepEqual(seq([], 1), ["qr"]);   // one empty beat = quarter rest
+  assert.deepEqual(seq([], 4), ["wr"]);   // empty 4/4 = whole rest
+
+  // a single onset fills to the barline -> a whole note (not a stack of 16ths)
+  assert.deepEqual(seq([0], 4), ["w"]);
+  // four downbeats -> four quarter notes
+  assert.deepEqual(seq([0, 4, 8, 12], 4), ["q", "q", "q", "q"]);
+  // two 8th-grid hits at the start: 8th, then a held note tied across to the end
+  assert.deepEqual(seq([0, 2], 4), ["8", "8~", "q~", "h"]);
+  // beat 1 of 16ths, last one held to the barline (no further onset to stop it)
+  assert.deepEqual(seq([0, 1, 2, 3], 4), ["16", "16", "16", "16~", "q~", "h"]);
+  // leading rest before the first onset
+  assert.deepEqual(seq([4], 4), ["qr", "q~", "h"]);
+  // gallop on beat 1: dotted-8th (0,1,2), then a 16th on the "a" held to the end
+  assert.deepEqual(seq([0, 3], 4), ["8.", "16~", "q~", "h"]);
+
+  // every note's first piece carries its onset step (for tap-marker alignment)
+  const steps = R.barNotes([0, 4], 4).filter(p => !p.isRest && p.step !== null).map(p => p.step);
+  assert.deepEqual(steps, [0, 4]);
 });
 
 // ---------------------------------------------------------------------------

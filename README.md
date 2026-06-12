@@ -16,7 +16,7 @@ Open `index.html` directly — no build, no server.
 
 - **Explore** — place target bells on a 16th grid; continuous loop; feel where they sit.
 - **Ear** — a phrase of N notes plays **once**; click every 16th you heard, then Submit. Replays cost points (active recall).
-- **Read** — a rhythm in standard notation (rests merged into the largest beat-aligned values). **New phrase** shows the notation silently; **Perform** counts you in in the meter (1·2·3·4, distinct woodblock), then records your taps for one bar, stops, and grades early / on-time / late. A marker lane under the staff plots each note (gray tick) against your tap (colored dot, offset left = early / right = late; red tick = stray tap). **Tolerance** (Loose / Normal / Strict) sets the perfect/good timing windows. No auto-advance — Perform again (costs points) or New phrase. Best attempt per phrase is banked.
+- **Read** — a rhythm in standard notation with real note durations: each note lasts until the next onset (so values vary — 16th, 8th, dotted-8th, quarter, half, whole), tied across beats, with rests only before the first note. **New phrase** shows the notation silently; **Perform** counts you in in the meter (1·2·3·4, distinct woodblock), then records your taps for one bar, stops, and grades early / on-time / late. A marker lane under the staff plots each note (gray tick) against your tap (colored dot, offset left = early / right = late; red tick = stray tap). **Tolerance** (Loose / Normal / Strict) sets the perfect/good timing windows. No auto-advance — Perform again (costs points) or New phrase. Best attempt per phrase is banked.
 
 A hidden **History** popover (📊, bottom bar) logs your last 10 submissions — mode, note count, score %, and time taken — persisted in localStorage.
 
@@ -43,7 +43,7 @@ covered by tests (don't let these silently change):
 - ear-mode playhead suppression (`shouldSuppressPlayhead`)
 - single-note quiz feedback (`quizResult`)
 - difficulty → note count (`difficultyNoteCount`) and phrase generation (`randomPattern`)
-- notation rest-merging (`barDurations`) — readable rests, not stacked 16ths
+- notation durations (`barNotes`) — real note values + ties via a metric decomposition, not stacked 16ths
 - points: `basePoints`, `pointsAvailable` (replay halving)
 - multi-note grading (`gradeSelection`)
 - read-mode timing (`classifyTiming`, `gradePerformance` incl. stray-tap reporting, `timingWindows`)

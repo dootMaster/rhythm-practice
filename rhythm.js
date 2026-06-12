@@ -188,26 +188,68 @@
     return pool.slice(0, noteCount).sort(function (a, b) { return a - b; });
   }
 
-  // Turn a phrase (onset steps) into a readable sequence of notes and rests for
-  // one bar. Notes stay 16th-note attacks; runs of empty slots are merged into
-  // the largest standard rest that stays aligned to the beat's binary
-  // subdivision (so a whole empty beat = a quarter rest, an empty 8th = an
-  // eighth rest, etc.) instead of four stacked 16th rests.
-  // Returns [{ isRest, dur: "16"|"16r"|"8r"|"qr", step: number|null }] in order.
-  function barDurations(pattern, beatsPerBar) {
-    var onsets = new Set(pattern);
-    var out = [];
-    function restDur(len) { return len === 4 ? "qr" : len === 2 ? "8r" : "16r"; }
-    function build(start, len) {
-      var any = false;
-      for (var i = start; i < start + len; i++) { if (onsets.has(i)) { any = true; break; } }
-      if (!any) { out.push({ isRest: true, dur: restDur(len), step: null }); return; }
-      if (len === 1) { out.push({ isRest: false, dur: "16", step: start }); return; }
-      var half = len / 2;
-      build(start, half);
-      build(start + half, half);
+  // Standard note values measured in 16th-note slots, longest first, with the
+  // VexFlow base duration + dot count.
+  var VALUES = [
+    { n: 16, dur: "w", dots: 0 }, { n: 12, dur: "h", dots: 1 }, { n: 8, dur: "h", dots: 0 },
+    { n: 6, dur: "q", dots: 1 }, { n: 4, dur: "q", dots: 0 }, { n: 3, dur: "8", dots: 1 },
+    { n: 2, dur: "8", dots: 0 }, { n: 1, dur: "16", dots: 0 },
+  ];
+  // May a value of length n.dots start at slot `pos` without crossing a metric
+  // boundary stronger than itself? Non-dotted notes align to their own length;
+  // dotted notes must start on the next-stronger (2*base) boundary.
+  function aligns(pos, v) {
+    if (v.dots === 0) return pos % v.n === 0;
+    var base = (v.n / 3) * 2;          // 3->2, 6->4, 12->8
+    return pos % (2 * base) === 0;
+  }
+  // Decompose a span [start, start+len) into tied standard note values that
+  // respect the metric grid (greedy longest-first).
+  function decompose(start, len) {
+    var out = [], pos = start, rem = len;
+    while (rem > 0) {
+      var chosen = null;
+      for (var k = 0; k < VALUES.length; k++) {
+        var v = VALUES[k];
+        if (v.n <= rem && aligns(pos, v)) { chosen = v; break; }
+      }
+      if (!chosen) chosen = { n: 1, dur: "16", dots: 0 }; // safety net
+      out.push({ dur: chosen.dur, dots: chosen.dots });
+      pos += chosen.n; rem -= chosen.n;
     }
-    for (var b = 0; b < beatsPerBar; b++) build(b * 4, 4); // one beat (4 sixteenths) at a time
+    return out;
+  }
+
+  // Turn a phrase (onset steps) into real notation for one bar: each note lasts
+  // until the next onset (or the barline), so note *values* vary (16th, 8th,
+  // dotted-8th, quarter, half, whole...) with ties across beats, and rests only
+  // appear before the first note. Returns an ordered list of pieces:
+  //   { isRest, dur, dots, step (onset step on a note's first piece, else null),
+  //     tie (true if this piece ties into the next) }
+  function barNotes(pattern, beatsPerBar) {
+    var total = beatsPerBar * 4;
+    var onsets = Array.from(new Set(pattern))
+      .filter(function (s) { return s >= 0 && s < total; })
+      .sort(function (a, b) { return a - b; });
+    var out = [];
+    var firstAttack = onsets.length ? onsets[0] : total;
+    if (firstAttack > 0) {
+      decompose(0, firstAttack).forEach(function (p) {
+        out.push({ isRest: true, dur: p.dur, dots: p.dots, step: null, tie: false });
+      });
+    }
+    for (var i = 0; i < onsets.length; i++) {
+      var start = onsets[i];
+      var end = i + 1 < onsets.length ? onsets[i + 1] : total;
+      var pieces = decompose(start, end - start);
+      pieces.forEach(function (p, idx) {
+        out.push({
+          isRest: false, dur: p.dur, dots: p.dots,
+          step: idx === 0 ? start : null,
+          tie: idx < pieces.length - 1,   // tie pieces of the same held note
+        });
+      });
+    }
     return out;
   }
 
@@ -320,7 +362,7 @@
     difficultyRange: difficultyRange,
     noteCountFor: noteCountFor,
     randomPattern: randomPattern,
-    barDurations: barDurations,
+    barNotes: barNotes,
     basePoints: basePoints,
     pointsAvailable: pointsAvailable,
     percent: percent,
