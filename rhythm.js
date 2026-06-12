@@ -151,9 +151,22 @@
 
   // ----- Difficulty & phrase generation -----
 
-  var NOTE_COUNTS = { easy: 2, medium: 3, hard: 4 };
-  function difficultyNoteCount(level) {
-    return NOTE_COUNTS[level] || NOTE_COUNTS.medium;
+  // Each level is an inclusive note-count band (counts are clamped to the bar
+  // size in randomPattern). "one" and "easy" are deliberately distinct.
+  var DIFFICULTY = {
+    one:    { min: 1, max: 1 },
+    easy:   { min: 1, max: 4 },
+    medium: { min: 4, max: 8 },
+    hard:   { min: 8, max: 16 },
+    random: { min: 1, max: 16 },
+  };
+  function difficultyRange(level) { return DIFFICULTY[level] || DIFFICULTY.easy; }
+
+  // Pick a note count uniformly within the level's range. rng for tests.
+  function noteCountFor(level, rng) {
+    rng = rng || Math.random;
+    var r = difficultyRange(level);
+    return r.min + Math.floor(rng() * (r.max - r.min + 1));
   }
 
   // Random phrase: `noteCount` distinct 16th steps within a bar of `totalSteps`,
@@ -300,7 +313,8 @@
     countInStep: countInStep,
     shouldSuppressPlayhead: shouldSuppressPlayhead,
     quizResult: quizResult,
-    difficultyNoteCount: difficultyNoteCount,
+    difficultyRange: difficultyRange,
+    noteCountFor: noteCountFor,
     randomPattern: randomPattern,
     barDurations: barDurations,
     basePoints: basePoints,

@@ -259,9 +259,11 @@
 
   <div class="difficulty" id="difficultyRow" style="display:none;">
     <span class="diff-label">Difficulty</span>
-    <button data-diff="easy">Easy · 2</button>
-    <button data-diff="medium" class="active">Medium · 3</button>
-    <button data-diff="hard">Hard · 4</button>
+    <button data-diff="one">One</button>
+    <button data-diff="easy" class="active">Easy · 1–4</button>
+    <button data-diff="medium">Med · 4–8</button>
+    <button data-diff="hard">Hard · 8–16</button>
+    <button data-diff="random">Random</button>
     <span class="diff-label" id="tolLabel" style="display:none; margin-left:0.6rem;">Tolerance</span>
     <button data-tol="loose" style="display:none;">Loose</button>
     <button data-tol="normal" class="active" style="display:none;">Normal</button>
@@ -390,7 +392,7 @@
   let playPulse = true;
   let countIn = false;
   let showQuizPlayhead = false;  // off by default — seeing the playhead gives the answer away
-  let difficulty = "medium";     // easy | medium | hard -> note count
+  let difficulty = "easy";       // one | easy | medium | hard | random -> note-count range
   let tolerance = "normal";      // read-mode timing strictness (loose|normal|strict)
   let readAnchors = null;        // [{f, x}] time-fraction -> notation x, for tap markers
   let readRenderWidth = 0;       // px width passed to the VexFlow renderer
@@ -740,7 +742,7 @@
     clearAdvance();
     if (phraseTimer) { clearTimeout(phraseTimer); phraseTimer = null; }
     phraseActive = false; tapWindowOpen = false;
-    phrase = R.randomPattern(R.difficultyNoteCount(difficulty), steps(), Math.random);
+    phrase = R.randomPattern(R.noteCountFor(difficulty, Math.random), steps(), Math.random);
     phraseSet = new Set(phrase);
     replays = 0; phraseAnswered = false; earSelection = new Set(); tapTimes = [];
     attempted = false; phraseBanked = 0; phraseCounted = false;

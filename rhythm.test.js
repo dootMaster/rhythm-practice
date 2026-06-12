@@ -201,11 +201,26 @@ test("quizResult marks correct and wrong with readable messages", () => {
 // ---------------------------------------------------------------------------
 // difficulty & phrase generation
 // ---------------------------------------------------------------------------
-test("difficultyNoteCount maps levels (all on the 16th grid)", () => {
-  assert.equal(R.difficultyNoteCount("easy"), 2);
-  assert.equal(R.difficultyNoteCount("medium"), 3);
-  assert.equal(R.difficultyNoteCount("hard"), 4);
-  assert.equal(R.difficultyNoteCount("bogus"), 3); // defaults to medium
+test("difficultyRange defines the note-count band per level", () => {
+  assert.deepEqual(R.difficultyRange("one"), { min: 1, max: 1 });
+  assert.deepEqual(R.difficultyRange("easy"), { min: 1, max: 4 });
+  assert.deepEqual(R.difficultyRange("medium"), { min: 4, max: 8 });
+  assert.deepEqual(R.difficultyRange("hard"), { min: 8, max: 16 });
+  assert.deepEqual(R.difficultyRange("random"), { min: 1, max: 16 });
+  assert.deepEqual(R.difficultyRange("bogus"), R.difficultyRange("easy")); // default
+});
+
+test("noteCountFor picks within the level's inclusive range", () => {
+  assert.equal(R.noteCountFor("one", () => 0), 1);
+  assert.equal(R.noteCountFor("one", () => 0.999), 1);
+  assert.equal(R.noteCountFor("easy", () => 0), 1);       // min
+  assert.equal(R.noteCountFor("easy", () => 0.999), 4);   // max
+  assert.equal(R.noteCountFor("medium", () => 0), 4);
+  assert.equal(R.noteCountFor("hard", () => 0.999), 16);
+  // stays in band across many draws
+  const seq = [0, 0.2, 0.4, 0.6, 0.8, 0.99]; let i = 0;
+  const rng = () => seq[i++ % seq.length];
+  for (let n = 0; n < 30; n++) { const c = R.noteCountFor("medium", rng); assert.ok(c >= 4 && c <= 8); }
 });
 
 test("randomPattern returns the right count of distinct, sorted, in-range steps", () => {
